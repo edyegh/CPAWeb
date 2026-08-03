@@ -1,0 +1,6 @@
+@CPAWeb.API_HostAddress = http://localhost:5233
+
+GET {{CPAWeb.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
