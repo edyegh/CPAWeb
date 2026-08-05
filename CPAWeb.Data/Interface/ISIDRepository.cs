@@ -11,5 +11,8 @@ namespace CPAWeb.Data.Interface
     {
         Task<SID?> GetSIDByNameAsync(string name);
         Task<bool> AddSIDAsync(SID sid);
+
+        Task<string?> GetFullNumberBySuffixAsync(string suffix);
+
     }
 }

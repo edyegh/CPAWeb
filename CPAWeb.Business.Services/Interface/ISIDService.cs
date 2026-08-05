@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using CPAWeb.Data.Model;
 using CPAWeb.Services.DTOs;
+using Microsoft.AspNetCore.Http;
 
 namespace CPAWeb.Services.Interface
 {
@@ -13,5 +14,6 @@ namespace CPAWeb.Services.Interface
     {
         Task<SIDDto> GetSIDByNameAsync(string name);
         Task<bool> AddSIDAsync(CreateSIDDto createDto);
+        Task<int> ProcessExcelFileAsync(IFormFile file);
     }
 }

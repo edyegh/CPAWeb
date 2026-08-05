@@ -43,5 +43,27 @@ namespace CPAWeb.API.Controllers
 
             return CreatedAtAction(nameof(GetByName), new { name = createDto.Name }, createDto);
         }
+
+        [HttpPost("upload-excel")]
+        public async Task<IActionResult> UploadExcel(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest("Խնդրում ենք վերբեռնել ֆայլ:");
+            }
+
+            if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("Խնդրում ենք վերբեռնել միայն .xlsx ֆորմատի Excel ֆայլ:");
+            }
+
+            int insertedCount = await _sidService.ProcessExcelFileAsync(file);
+
+            return Ok(new
+            {
+                Message = $"Ֆայլը հաջողությամբ մշակվեց: Ավելացվեց {insertedCount} նոր տող:",
+                InsertedCount = insertedCount
+            });
+        }
     }
 }
