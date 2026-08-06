@@ -74,12 +74,13 @@ namespace CPAWeb.Data.Repository
         {
             using (var connection = new SqlConnection(_connectionString))
             {
+                string cleanSuffix = suffix.Trim().Split(' ')[0];
                 // LIKE '%9008' պայմանով գտնում ենք ամբողջական Number-ը
                 var query = "SELECT TOP 1 Number FROM cpa_sid WHERE Number LIKE @Suffix";
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.Parameters.Add("@Suffix", SqlDbType.NVarChar, 50).Value = "%" + suffix;
+                    command.Parameters.Add("@Suffix", SqlDbType.NVarChar, 50).Value = "%" + cleanSuffix;
 
                     await connection.OpenAsync();
                     var result = await command.ExecuteScalarAsync();

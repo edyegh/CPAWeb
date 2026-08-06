@@ -44,26 +44,25 @@ namespace CPAWeb.API.Controllers
             return CreatedAtAction(nameof(GetByName), new { name = createDto.Name }, createDto);
         }
 
-        [HttpPost("upload-excel")]
-        public async Task<IActionResult> UploadExcel(IFormFile file)
+        [HttpPost("parse-preview")]
+        public async Task<IActionResult> ParsePreview(IFormFile file)
         {
             if (file == null || file.Length == 0)
-            {
-                return BadRequest("Խնդրում ենք վերբեռնել ֆայլ:");
-            }
+                return BadRequest("excel ֆայլը դատարկ է:");
 
-            if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest("Խնդրում ենք վերբեռնել միայն .xlsx ֆորմատի Excel ֆայլ:");
-            }
+            var result = await _sidService.ParseExcelPreviewAsync(file);
+            return Ok(result);
+        }
 
-            int insertedCount = await _sidService.ProcessExcelFileAsync(file);
+        // 2. Կոնկրետ 1 sheet-ի տվյալները բազա ուղարկելու endpoint
+        [HttpPost("import-sheet")]
+        public async Task<IActionResult> ImportSheet([FromBody] ImportSheetRequestDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.SheetName))
+                return BadRequest("անվավեր տվյալներ:");
 
-            return Ok(new
-            {
-                Message = $"Ֆայլը հաջողությամբ մշակվեց: Ավելացվեց {insertedCount} նոր տող:",
-                InsertedCount = insertedCount
-            });
+            int insertedCount = await _sidService.SaveSheetDataAsync(dto);
+            return Ok(insertedCount);
         }
     }
 }

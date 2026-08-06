@@ -12,8 +12,11 @@ namespace CPAWeb.Services.Interface
 {
     public interface ISIDService
     {
-        Task<SIDDto> GetSIDByNameAsync(string name);
         Task<bool> AddSIDAsync(CreateSIDDto createDto);
-        Task<int> ProcessExcelFileAsync(IFormFile file);
+        Task<SIDDto?> GetSIDByNameAsync(string name);
+
+        // Նոր մեթոդները
+        Task<List<ExcelSheetPreviewDto>> ParseExcelPreviewAsync(IFormFile file);
+        Task<int> SaveSheetDataAsync(ImportSheetRequestDto dto);
     }
 }

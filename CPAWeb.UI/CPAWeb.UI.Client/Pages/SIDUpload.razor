@@ -1,0 +1,163 @@
+﻿@page "/"
+@page "/sid-upload"
+@using System.Net.Http.Headers
+@using CPAWeb.Services.DTOs
+@inject HttpClient Http
+
+<div class="container mt-4">
+    <!-- File Upload Section -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <InputFile OnChange="OnInputFileChange" class="form-control" style="max-width: 350px;" accept=".xlsx" />
+        <button class="btn btn-primary" @onclick="ParseFileAsync" disabled="@(selectedFile == null || isParsing)">
+            @if (isParsing)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            կարդալ ֆայլը
+        </button>
+    </div>
+
+    @if (sheets != null && sheets.Any())
+    {
+        <h4 class="mt-4 mb-3">excel-ի էջերը (sheets).</h4>
+
+        <!-- Tabs Navigation -->
+        <ul class="nav nav-pills mb-3">
+            @foreach (var sheet in sheets)
+            {
+                <li class="nav-item">
+                    <button class="nav-link @(activeSheet?.SheetName == sheet.SheetName ? "active" : "")"
+                            @onclick="() => activeSheet = sheet">
+                        @sheet.SheetName
+                    </button>
+                </li>
+            }
+        </ul>
+
+        <!-- Selected Sheet Content -->
+        @if (activeSheet != null)
+        {
+            <div class="card shadow-sm p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">էջ` <strong>@activeSheet.SheetName</strong></h5>
+                    <button class="btn btn-success"
+                            @onclick="SaveActiveSheetAsync"
+                            disabled="@(isSaving || !activeSheet.YellowRowFirstColumnValues.Any())">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        ուղարկել այս էջի տվյալները բազա
+                    </button>
+                </div>
+
+                <!-- Yellow Values List -->
+                <div class="border rounded">
+                    @if (activeSheet.YellowRowFirstColumnValues.Any())
+                    {
+                        @foreach (var item in activeSheet.YellowRowFirstColumnValues)
+                        {
+                            <div class="p-2 border-bottom" style="background-color: #fffde7;">
+                                @item
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-3 text-muted">այս էջում դեղինով նշված տողեր չեն գտնվել:</div>
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-info mt-3">@statusMessage</div>
+    }
+</div>
+
+@code {
+    private IBrowserFile? selectedFile;
+    private List<ExcelSheetPreviewDto>? sheets;
+    private ExcelSheetPreviewDto? activeSheet;
+    private bool isParsing = false;
+    private bool isSaving = false;
+    private string? statusMessage;
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        sheets = null;
+        activeSheet = null;
+        statusMessage = null;
+    }
+
+    private async Task ParseFileAsync()
+    {
+        if (selectedFile == null) return;
+        isParsing = true;
+        statusMessage = null;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(selectedFile.OpenReadStream(10 * 1024 * 1024));
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
+            content.Add(streamContent, "file", selectedFile.Name);
+
+            var response = await Http.PostAsync("api/sid/parse-preview", content);
+            if (response.IsSuccessStatusCode)
+            {
+                sheets = await response.Content.ReadFromJsonAsync<List<ExcelSheetPreviewDto>>();
+                activeSheet = sheets?.FirstOrDefault();
+            }
+            else
+            {
+                statusMessage = "սխալ ֆայլը կարդալիս:";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"սխալ: {ex.Message}";
+        }
+        finally
+        {
+            isParsing = false;
+        }
+    }
+
+    private async Task SaveActiveSheetAsync()
+    {
+        if (activeSheet == null) return;
+        isSaving = true;
+
+        try
+        {
+            var dto = new ImportSheetRequestDto
+            {
+                SheetName = activeSheet.SheetName,
+                Items = activeSheet.YellowRowFirstColumnValues
+            };
+
+            var response = await Http.PostAsJsonAsync("api/sid/import-sheet", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                int count = await response.Content.ReadFromJsonAsync<int>();
+                statusMessage = $"«{activeSheet.SheetName}» էջից հաջողությամբ պահպանվեց {count} գրանցում:";
+            }
+            else
+            {
+                statusMessage = "սխալ տվյալները պահպանելիս:";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"սխալ: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
