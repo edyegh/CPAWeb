@@ -1,163 +1,323 @@
-﻿@page "/"
-@page "/sid-upload"
+﻿@page "/sid-upload"
+@page "/"
 @using System.Net.Http.Headers
 @using CPAWeb.Services.DTOs
 @inject HttpClient Http
 
-<div class="container mt-4">
-    <!-- File Upload Section -->
-    <div class="d-flex align-items-center gap-3 mb-4">
-        <InputFile OnChange="OnInputFileChange" class="form-control" style="max-width: 350px;" accept=".xlsx" />
-        <button class="btn btn-primary" @onclick="ParseFileAsync" disabled="@(selectedFile == null || isParsing)">
-            @if (isParsing)
-            {
-                <span class="spinner-border spinner-border-sm me-1"></span>
-            }
-            կարդալ ֆայլը
-        </button>
-    </div>
+<div class="cpa-page-wrapper">
+    <!-- Header Section -->
+    <header class="cpa-header">
+        <div class="brand-title">CPA</div>
 
-    @if (sheets != null && sheets.Any())
-    {
-        <h4 class="mt-4 mb-3">excel-ի էջերը (sheets).</h4>
+        <div class="search-container">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text"
+                       class="form-control border-start-0 shadow-none"
+                       placeholder="Search by name..."
+                       @bind="searchQuery"
+                       @onkeyup="HandleKeyUp" />
+                <button class="btn btn-primary px-4 fw-semibold" @onclick="ExecuteSearch" disabled="@isSearching">
+                    @if (isSearching)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Search
+                </button>
+            </div>
+        </div>
 
-        <!-- Tabs Navigation -->
-        <ul class="nav nav-pills mb-3">
-            @foreach (var sheet in sheets)
-            {
-                <li class="nav-item">
-                    <button class="nav-link @(activeSheet?.SheetName == sheet.SheetName ? "active" : "")"
-                            @onclick="() => activeSheet = sheet">
-                        @sheet.SheetName
-                    </button>
-                </li>
-            }
-        </ul>
+        <div class="telecom-logo-container">
+            <img src="assets/images/team-telecom-logo.png" alt="Team Telecom Armenia" class="telecom-logo-img" />
+        </div>
+    </header>
 
-        <!-- Selected Sheet Content -->
-        @if (activeSheet != null)
+    <!-- Main Content Area -->
+    <main class="cpa-content">
+        @if (searchResult != null)
         {
-            <div class="card shadow-sm p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">էջ` <strong>@activeSheet.SheetName</strong></h5>
-                    <button class="btn btn-success"
-                            @onclick="SaveActiveSheetAsync"
-                            disabled="@(isSaving || !activeSheet.YellowRowFirstColumnValues.Any())">
-                        @if (isSaving)
+            <div class="card result-card shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="m-0 fw-bold text-secondary">Search Result</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col" style="width: 30%;">ID</th>
+                                    <th scope="col" style="width: 70%;">Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge bg-light text-dark fs-6 border">@searchResult.Number</span></td>
+                                    <td class="fw-bold text-dark">@searchResult.Name</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (isSearching)
+        {
+            <div class="text-center my-5 py-5">
+                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                <p class="text-muted mt-3 fs-5">Searching...</p>
+            </div>
+        }
+        else if (hasSearched && isNotFound)
+        {
+            <div class="alert alert-warning border-0 shadow-sm text-center my-4 py-4 fs-5" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i> No records found for "<strong>@executedQuery</strong>"
+            </div>
+        }
+        else
+        {
+            <div class="empty-state text-center my-5 py-5">
+                <h2 class="fw-bold text-secondary mb-3">Find Name Location or Register New Name</h2>
+                <p class="text-muted fs-5">Use the search bar above or add a new record using the buttons below.</p>
+            </div>
+        }
+    </main>
+
+    <!-- Footer Actions -->
+    <footer class="cpa-actions">
+        <button class="btn btn-success btn-custom me-3" @onclick="OpenAddNameModal">
+            <i class="bi bi-plus-lg me-1"></i> Add new name
+        </button>
+
+        <label for="excel-upload-input" class="btn btn-outline-success btn-custom m-0">
+            <i class="bi bi-file-earmark-excel me-1"></i> Upload File
+        </label>
+        <InputFile id="excel-upload-input" OnChange="OnInputFileChange" accept=".xlsx" style="display:none;" />
+    </footer>
+</div>
+
+<!-- 1. ADD NEW NAME MODAL -->
+@if (isAddModalOpen)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">Register New Name</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAddNameModal"></button>
+                </div>
+                <div class="modal-body pt-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg fs-6" @bind="newRecord.Name" placeholder="Enter full name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary">Number <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg fs-6" @bind="newRecord.Number" placeholder="Enter number" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(addError))
+                    {
+                        <div class="alert alert-danger py-2 mt-3 mb-0">@addError</div>
+                    }
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light px-4" @onclick="CloseAddNameModal">Cancel</button>
+                    <button type="button" class="btn btn-success px-4" @onclick="SaveNewRecord" disabled="@isSavingRecord">
+                        @if (isSavingRecord)
                         {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                         }
-                        ուղարկել այս էջի տվյալները բազա
+                        Save Record
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+}
 
-                <!-- Yellow Values List -->
-                <div class="border rounded">
-                    @if (activeSheet.YellowRowFirstColumnValues.Any())
+<!-- 2. EXCEL PREVIEW MODAL -->
+@if (isPreviewModalOpen)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Excel Data Preview & Import</h5>
+                    <button type="button" class="btn-close" @onclick="ClosePreviewModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (isLoading)
                     {
-                        @foreach (var item in activeSheet.YellowRowFirstColumnValues)
+                        <div class="text-center my-5">
+                            <div class="spinner-border text-success" role="status"></div>
+                            <p class="mt-2 text-muted">Processing Excel file...</p>
+                        </div>
+                    }
+                    else if (previewSheets != null && previewSheets.Any())
+                    {
+                        @foreach (var sheet in previewSheets)
                         {
-                            <div class="p-2 border-bottom" style="background-color: #fffde7;">
-                                @item
+                            <div class="card mb-3 border">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                    <h6 class="m-0 fw-bold text-dark">Sheet: @sheet.SheetName</h6>
+                                    <button class="btn btn-sm btn-success px-3" @onclick="() => ImportSheet(sheet)">
+                                        Save Sheet Data
+                                    </button>
+                                </div>
                             </div>
                         }
                     }
                     else
                     {
-                        <div class="p-3 text-muted">այս էջում դեղինով նշված տողեր չեն գտնվել:</div>
+                        <div class="alert alert-warning m-0 border-0">No highlighted rows found in the file.</div>
                     }
                 </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary px-4" @onclick="ClosePreviewModal">Close</button>
+                </div>
             </div>
-        }
-    }
-
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-        <div class="alert alert-info mt-3">@statusMessage</div>
-    }
-</div>
+        </div>
+    </div>
+}
 
 @code {
-    private IBrowserFile? selectedFile;
-    private List<ExcelSheetPreviewDto>? sheets;
-    private ExcelSheetPreviewDto? activeSheet;
-    private bool isParsing = false;
-    private bool isSaving = false;
-    private string? statusMessage;
+    private string searchQuery = string.Empty;
+    private string executedQuery = string.Empty;
+    private SIDDto? searchResult;
+    private bool isSearching = false;
+    private bool isNotFound = false;
+    private bool hasSearched = false;
 
-    private void OnInputFileChange(InputFileChangeEventArgs e)
+    private bool isAddModalOpen = false;
+    private bool isSavingRecord = false;
+    private string addError = string.Empty;
+    private CreateSIDDto newRecord = new();
+
+    private bool isPreviewModalOpen = false;
+    private bool isLoading = false;
+    private List<ExcelSheetPreviewDto> previewSheets = new();
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
     {
-        selectedFile = e.File;
-        sheets = null;
-        activeSheet = null;
-        statusMessage = null;
-    }
-
-    private async Task ParseFileAsync()
-    {
-        if (selectedFile == null) return;
-        isParsing = true;
-        statusMessage = null;
-
-        try
+        if (e.Key == "Enter")
         {
-            using var content = new MultipartFormDataContent();
-            var streamContent = new StreamContent(selectedFile.OpenReadStream(10 * 1024 * 1024));
-            streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
-            content.Add(streamContent, "file", selectedFile.Name);
-
-            var response = await Http.PostAsync("api/sid/parse-preview", content);
-            if (response.IsSuccessStatusCode)
-            {
-                sheets = await response.Content.ReadFromJsonAsync<List<ExcelSheetPreviewDto>>();
-                activeSheet = sheets?.FirstOrDefault();
-            }
-            else
-            {
-                statusMessage = "սխալ ֆայլը կարդալիս:";
-            }
-        }
-        catch (Exception ex)
-        {
-            statusMessage = $"սխալ: {ex.Message}";
-        }
-        finally
-        {
-            isParsing = false;
+            await ExecuteSearch();
         }
     }
 
-    private async Task SaveActiveSheetAsync()
+    private async Task ExecuteSearch()
     {
-        if (activeSheet == null) return;
-        isSaving = true;
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            searchResult = null;
+            isNotFound = false;
+            hasSearched = false;
+            return;
+        }
+
+        isSearching = true;
+        isNotFound = false;
+        hasSearched = true;
+        executedQuery = searchQuery;
 
         try
         {
-            var dto = new ImportSheetRequestDto
-            {
-                SheetName = activeSheet.SheetName,
-                Items = activeSheet.YellowRowFirstColumnValues
-            };
-
-            var response = await Http.PostAsJsonAsync("api/sid/import-sheet", dto);
-            if (response.IsSuccessStatusCode)
-            {
-                int count = await response.Content.ReadFromJsonAsync<int>();
-                statusMessage = $"«{activeSheet.SheetName}» էջից հաջողությամբ պահպանվեց {count} գրանցում:";
-            }
-            else
-            {
-                statusMessage = "սխալ տվյալները պահպանելիս:";
-            }
+            searchResult = await Http.GetFromJsonAsync<SIDDto>($"api/sid/{Uri.EscapeDataString(searchQuery)}");
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            statusMessage = $"սխալ: {ex.Message}";
+            searchResult = null;
+            isNotFound = true;
+        }
+        catch
+        {
+            searchResult = null;
         }
         finally
         {
-            isSaving = false;
+            isSearching = false;
         }
+    }
+
+    private void OpenAddNameModal()
+    {
+        newRecord = new CreateSIDDto();
+        addError = string.Empty;
+        isAddModalOpen = true;
+    }
+
+    private void CloseAddNameModal()
+    {
+        isAddModalOpen = false;
+    }
+
+    private async Task SaveNewRecord()
+    {
+        if (string.IsNullOrWhiteSpace(newRecord.Name) || string.IsNullOrWhiteSpace(newRecord.Number))
+        {
+            addError = "Please fill in both Name and Number.";
+            return;
+        }
+
+        isSavingRecord = true;
+        addError = string.Empty;
+
+        var response = await Http.PostAsJsonAsync("api/sid", newRecord);
+        if (response.IsSuccessStatusCode)
+        {
+            isAddModalOpen = false;
+            searchQuery = newRecord.Name;
+            await ExecuteSearch();
+        }
+        else
+        {
+            addError = "Չհաջողվեց ավելացնել տվյալները:";
+        }
+        isSavingRecord = false;
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        isLoading = true;
+        isPreviewModalOpen = true;
+
+        using var content = new MultipartFormDataContent();
+        var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 10485760));
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        content.Add(fileContent, "file", file.Name);
+
+        var response = await Http.PostAsync("api/sid/parse-preview", content);
+        if (response.IsSuccessStatusCode)
+        {
+            previewSheets = await response.Content.ReadFromJsonAsync<List<ExcelSheetPreviewDto>>() ?? new();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task ImportSheet(ExcelSheetPreviewDto sheet)
+    {
+        var request = new ImportSheetRequestDto
+        {
+            SheetName = sheet.SheetName
+        };
+
+        var response = await Http.PostAsJsonAsync("api/sid/import-sheet", request);
+        if (response.IsSuccessStatusCode)
+        {
+            previewSheets.Remove(sheet);
+        }
+    }
+
+    private void ClosePreviewModal()
+    {
+        isPreviewModalOpen = false;
+        previewSheets.Clear();
     }
 }
