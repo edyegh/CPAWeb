@@ -379,14 +379,20 @@
 
         var request = new ImportSheetRequestDto
         {
-            SheetName = sheet.SheetName
+            SheetName = sheet.SheetName,
+            Items = sheet.YellowRowFirstColumnValues   // ← add this
         };
 
         var response = await Http.PostAsJsonAsync("api/sid/import-sheet", request);
         if (response.IsSuccessStatusCode)
         {
-            expandedSheetNames.Remove(sheet.SheetName);
-            previewSheets.Remove(sheet);
+            int count = await response.Content.ReadFromJsonAsync<int>();
+            if (count > 0)
+            {
+                expandedSheetNames.Remove(sheet.SheetName);
+                previewSheets.Remove(sheet);
+            }
+            // else: show a message instead of silently removing
         }
 
         savingSheetNames.Remove(sheet.SheetName);
