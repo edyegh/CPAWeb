@@ -14,34 +14,14 @@ namespace CPAWeb.Data.Repository
 {
     public class SIDRepository : ISIDRepository
     {
+        // Ժամանակավոր աղյուսակը, որտեղ պահվում են ընթացիկ sheet-ի անունները
+        private const string StagingTable = "edyeghiazaryan_insertvalue";
+
         private readonly string _connectionString;
 
         public SIDRepository(string connectionString)
         {
             _connectionString = connectionString;
-        }
-
-        public async Task<bool> AddSIDAsync(SID sid)
-        {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                
-
-                var query = @"INSERT INTO cpa_sid (Name, Number) 
-                      VALUES (@Name, @Number)";
-
-                using (var command = new SqlCommand(query, connection))
-                {
-                    // Առանց ֆիքսված չափի, որպեսզի երկար Name-երը լուռ չկտրվեն
-                    command.Parameters.Add("@Name", SqlDbType.NVarChar).Value = sid.Name;
-                    command.Parameters.Add("@Number", SqlDbType.NVarChar).Value = sid.Number;
-
-                    await connection.OpenAsync();
-                    int rowsAffected = await command.ExecuteNonQueryAsync();
-
-                    return rowsAffected > 0;
-                }
-            }
         }
 
         public async Task<SID?> GetSIDByNameAsync(string name)
@@ -73,7 +53,100 @@ namespace CPAWeb.Data.Repository
             return null;
         }
 
-        public async Task<string?> GetFullNumberBySuffixAsync(string suffix)  // sa patasxanatu e linelu hetagayum shiti hamarov service id n u account id n talu hamar 
+        // =========================================================================
+        // ԺԱՄԱՆԱԿԱՎՈՐ ԱՂՅՈՒՍԱԿ (edyeghiazaryan_insertvalue) — միայն Name սյունակ
+        // =========================================================================
+
+        // Մաքրում ենք ժամանակավոր աղյուսակը և լցնում ընթացիկ sheet-ի արժեքներով
+        public async Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names)
+        {
+            var list = names?.Where(n => !string.IsNullOrWhiteSpace(n))
+                             .Select(n => n.Trim())
+                             .ToList() ?? new List<string>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var transaction = connection.BeginTransaction())
+                {
+                    using (var truncate = new SqlCommand($"TRUNCATE TABLE {StagingTable}", connection, transaction))
+                    {
+                        await truncate.ExecuteNonQueryAsync();
+                    }
+
+                    int inserted = 0;
+
+                    if (list.Count > 0)
+                    {
+                        var query = $"INSERT INTO {StagingTable} (Name) VALUES (@Name)";
+
+                        using (var command = new SqlCommand(query, connection, transaction))
+                        {
+                            var parameter = command.Parameters.Add("@Name", SqlDbType.NVarChar);
+
+                            foreach (var name in list)
+                            {
+                                parameter.Value = name;
+                                inserted += await command.ExecuteNonQueryAsync();
+                            }
+                        }
+                    }
+
+                    transaction.Commit();
+                    return inserted;
+                }
+            }
+        }
+
+        public async Task<int> GetStagingCountAsync()
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand($"SELECT COUNT(*) FROM {StagingTable}", connection))
+            {
+                await connection.OpenAsync();
+                var result = await command.ExecuteScalarAsync();
+
+                return result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+            }
+        }
+
+        // Ժամանակավոր աղյուսակի Name-երը գրանցում ենք cpa_sid-ում տրված Number-ով,
+        // ապա անմիջապես մաքրում ենք ժամանակավոր աղյուսակը
+        public async Task<int> TransferStagingToSIDAsync(string number)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var transaction = connection.BeginTransaction())
+                {
+                    int inserted;
+
+                    var query = $@"INSERT INTO cpa_sid (Name, Number)
+                                   SELECT Name, @Number FROM {StagingTable}";
+
+                    using (var command = new SqlCommand(query, connection, transaction))
+                    {
+                        command.Parameters.Add("@Number", SqlDbType.NVarChar).Value = number;
+                        inserted = await command.ExecuteNonQueryAsync();
+                    }
+
+                    if (inserted > 0)
+                    {
+                        using (var truncate = new SqlCommand($"TRUNCATE TABLE {StagingTable}", connection, transaction))
+                        {
+                            await truncate.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    transaction.Commit();
+                    return inserted;
+                }
+            }
+        }
+
+        public async Task<string?> GetFullNumberBySuffixAsync(string suffix)// sa patasxanatu e linelu hetagayum shiti hamarov service id n u account id n talu hamar 
         {
             using (var connection = new SqlConnection(_connectionString))
             {

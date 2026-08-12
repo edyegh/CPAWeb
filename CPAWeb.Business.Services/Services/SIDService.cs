@@ -24,10 +24,21 @@ namespace CPAWeb.Business.Services.Services
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
+        // "add new name" կոճակը նույնպես անցնում է ժամանակավոր աղյուսակով.
+        // 1) Name -> edyeghiazaryan_insertvalue, 2) -> cpa_sid տրված Number-ով, 3) TRUNCATE
         public async Task<bool> AddSIDAsync(CreateSIDDto createDto)
         {
             var entity = _mapper.Map<SID>(createDto);
-            return await _sidRepository.AddSIDAsync(entity);
+
+            if (entity == null || string.IsNullOrWhiteSpace(entity.Name))
+            {
+                throw new ArgumentException("Name cannot be empty.", nameof(createDto));
+            }
+
+            await _sidRepository.ReplaceStagingNamesAsync(new[] { entity.Name });
+
+            int inserted = await CommitStagedNamesAsync(entity.Number);
+            return inserted > 0;
         }
 
         public async Task<SIDDto?> GetSIDByNameAsync(string name)
@@ -90,40 +101,46 @@ namespace CPAWeb.Business.Services.Services
         // =========================================================================
         // 2. ԳՐԱՆՑԵԼ ՄԻԱՅՆ ԸՆՏՐՎԱԾ SHЕЕТ-Ի ՏՎՅԱԼՆԵՐԸ (UI-ի ԿՈՃԱԿԸ ՍԵՂՄԵԼԻՍ)
         // =========================================================================
-        public async Task<int> SaveSheetDataAsync(ImportSheetRequestDto dto)
+        public async Task<StageSheetResultDto> SaveSheetDataAsync(ImportSheetRequestDto dto)
         {
+            var result = new StageSheetResultDto
+            {
+                SheetName = dto?.SheetName ?? string.Empty
+            };
+
             if (dto == null || string.IsNullOrWhiteSpace(dto.SheetName) || dto.Items == null || !dto.Items.Any())
             {
-                return 0;
+                return result;
             }
 
-            // SheetName-ից ("Nikita 5124" կամ "5124") կառուցում ենք ամբողջական համարը՝ 37488005124
-            string? fullNumber = BuildFullNumber(dto.SheetName);
+            // Ընտրված sheet-ի արժեքները դնում ենք ժամանակավոր աղյուսակի Name սյունակում
+            result.StagedCount = await _sidRepository.ReplaceStagingNamesAsync(dto.Items);
 
-            // Եթե SheetName-ում թվեր չկան, փորձում ենք գտնել բազայից
-            if (fullNumber == null)
+            // SheetName-ից ("Nikita 5124" կամ "5124") առաջարկում ենք համարը՝ 37488005124
+            result.SuggestedNumber = BuildFullNumber(dto.SheetName)
+                                     ?? await _sidRepository.GetFullNumberBySuffixAsync(dto.SheetName);
+
+            return result;
+        }
+
+        // =========================================================================
+        // 3. ԺԱՄԱՆԱԿԱՎՈՐ ԱՂՅՈՒՍԱԿԻՑ cpa_sid ԵՎ ՄԱՔՐՈՒՄ (TRUNCATE)
+        // =========================================================================
+        public async Task<int> CommitStagedNamesAsync(string number)
+        {
+            if (string.IsNullOrWhiteSpace(number))
             {
-                fullNumber = await _sidRepository.GetFullNumberBySuffixAsync(dto.SheetName);
+                throw new ArgumentException("Համարը դատարկ է:", nameof(number));
             }
 
-            int successCount = 0;
+            string cleanNumber = new string(number.Where(char.IsDigit).ToArray());
 
-            foreach (var sidName in dto.Items)
+            if (cleanNumber.Length == 0)
             {
-                var newSid = new SID
-                {
-                    Name = sidName,
-                    Number = fullNumber ?? dto.SheetName // Եթե չգտնի, դնում է SheetName-ը
-                };
-
-                bool isInserted = await _sidRepository.AddSIDAsync(newSid);
-                if (isInserted)
-                {
-                    successCount++;
-                }
+                throw new ArgumentException("Համարը պետք է պարունակի թվեր:", nameof(number));
             }
 
-            return successCount;
+            return await _sidRepository.TransferStagingToSIDAsync(cleanNumber);
         }
 
         // =========================================================================

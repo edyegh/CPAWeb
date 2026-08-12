@@ -17,6 +17,11 @@ namespace CPAWeb.Services.Interface
 
         // Նոր մեթոդները
         Task<List<ExcelSheetPreviewDto>> ParseExcelPreviewAsync(IFormFile file);
-        Task<int> SaveSheetDataAsync(ImportSheetRequestDto dto);
+
+        // 1. Sheet-ի արժեքները դնում է ժամանակավոր աղյուսակում (edyeghiazaryan_insertvalue)
+        Task<StageSheetResultDto> SaveSheetDataAsync(ImportSheetRequestDto dto);
+
+        // 2. Ժամանակավոր աղյուսակի անունները գրանցում է cpa_sid-ում տրված համարով և մաքրում աղյուսակը
+        Task<int> CommitStagedNamesAsync(string number);
     }
 }

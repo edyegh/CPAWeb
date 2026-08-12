@@ -231,6 +231,44 @@
     </div>
 }
 
+<!-- 3. MAIN NUMBER MODAL (staged names -> cpa_sid) -->
+@if (isNumberModalOpen)
+{
+    <div class="modal-backdrop fade show" style="z-index: 1060;"></div>
+    <div class="modal fade show d-block" tabindex="-1" style="z-index: 1061;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">enter main number</h5>
+                    <button type="button" class="btn-close" @onclick="CloseNumberModal"></button>
+                </div>
+                <div class="modal-body pt-4">
+                    <p class="text-muted mb-3">
+                        <strong>@stagedCount</strong> name(s) from sheet
+                        "<strong>@stagedSheetName</strong>" are ready to be saved.
+                    </p>
+                    <label class="form-label fw-semibold text-secondary">number <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-lg fs-6" @bind="mainNumber" placeholder="197488005124" />
+                    @if (!string.IsNullOrEmpty(commitError))
+                    {
+                        <div class="alert alert-danger py-2 mt-3 mb-0">@commitError</div>
+                    }
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light px-4" @onclick="CloseNumberModal">cancel</button>
+                    <button type="button" class="btn btn-success px-4" @onclick="CommitStagedNames" disabled="@isCommitting">
+                        @if (isCommitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        save to cpa_sid
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // Search State
     private string searchQuery = string.Empty;
@@ -254,6 +292,15 @@
     // Frontend Only UI States
     private HashSet<string> expandedSheetNames = new();
     private List<string> savingSheetNames = new();
+
+    // Main Number Modal State (staged names -> cpa_sid)
+    private bool isNumberModalOpen = false;
+    private bool isCommitting = false;
+    private string mainNumber = string.Empty;
+    private string commitError = string.Empty;
+    private string stagedSheetName = string.Empty;
+    private int stagedCount = 0;
+    private ExcelSheetPreviewDto? stagedSheet;
 
     // --- Search Logic ---
     private async Task HandleKeyUp(KeyboardEventArgs e)
@@ -373,6 +420,7 @@
         }
     }
 
+    // Քայլ 1. Sheet-ի արժեքները դնում ենք ժամանակավոր աղյուսակում
     private async Task ImportSheet(ExcelSheetPreviewDto sheet)
     {
         savingSheetNames.Add(sheet.SheetName);
@@ -380,21 +428,69 @@
         var request = new ImportSheetRequestDto
         {
             SheetName = sheet.SheetName,
-            Items = sheet.YellowRowFirstColumnValues   // ← add this
+            Items = sheet.YellowRowFirstColumnValues
         };
 
         var response = await Http.PostAsJsonAsync("api/sid/import-sheet", request);
         if (response.IsSuccessStatusCode)
         {
-            int count = await response.Content.ReadFromJsonAsync<int>();
-            if (count > 0)
+            var result = await response.Content.ReadFromJsonAsync<StageSheetResultDto>();
+            if (result != null && result.StagedCount > 0)
             {
-                expandedSheetNames.Remove(sheet.SheetName);
-                previewSheets.Remove(sheet);
+                // Քայլ 2. Հարցնում ենք հիմնական համարը
+                stagedSheet = sheet;
+                stagedSheetName = sheet.SheetName;
+                stagedCount = result.StagedCount;
+                mainNumber = result.SuggestedNumber ?? string.Empty;
+                commitError = string.Empty;
+                isNumberModalOpen = true;
             }
         }
 
         savingSheetNames.Remove(sheet.SheetName);
+    }
+
+    // Քայլ 3. Ժամանակավոր աղյուսակից cpa_sid և TRUNCATE
+    private async Task CommitStagedNames()
+    {
+        if (string.IsNullOrWhiteSpace(mainNumber))
+        {
+            commitError = "please enter the main number.";
+            return;
+        }
+
+        isCommitting = true;
+        commitError = string.Empty;
+
+        var response = await Http.PostAsJsonAsync("api/sid/commit-staged",
+            new CommitStagedRequestDto { Number = mainNumber.Trim() });
+
+        if (response.IsSuccessStatusCode)
+        {
+            if (stagedSheet != null)
+            {
+                expandedSheetNames.Remove(stagedSheet.SheetName);
+                previewSheets.Remove(stagedSheet);
+            }
+
+            CloseNumberModal();
+        }
+        else
+        {
+            commitError = "չհաջողվեց գրանցել տվյալները:";
+        }
+
+        isCommitting = false;
+    }
+
+    private void CloseNumberModal()
+    {
+        isNumberModalOpen = false;
+        stagedSheet = null;
+        stagedSheetName = string.Empty;
+        stagedCount = 0;
+        mainNumber = string.Empty;
+        commitError = string.Empty;
     }
 
     private void ClosePreviewModal()

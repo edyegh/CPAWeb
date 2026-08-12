@@ -54,14 +54,29 @@ namespace CPAWeb.API.Controllers
             return Ok(result);
         }
 
-        // 2. Կոնկրետ 1 sheet-ի տվյալները բազա ուղարկելու endpoint
+        // 2. Կոնկրետ 1 sheet-ի արժեքները ժամանակավոր աղյուսակ ուղարկելու endpoint
         [HttpPost("import-sheet")]
         public async Task<IActionResult> ImportSheet([FromBody] ImportSheetRequestDto dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.SheetName))
                 return BadRequest("անվավեր տվյալներ:");
 
-            int insertedCount = await _sidService.SaveSheetDataAsync(dto);
+            var result = await _sidService.SaveSheetDataAsync(dto);
+            return Ok(result);
+        }
+
+        // 3. Ժամանակավոր աղյուսակի անունները գրանցել cpa_sid-ում տրված համարով և մաքրել աղյուսակը
+        [HttpPost("commit-staged")]
+        public async Task<IActionResult> CommitStaged([FromBody] CommitStagedRequestDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Number))
+                return BadRequest("համարը պարտադիր է:");
+
+            int insertedCount = await _sidService.CommitStagedNamesAsync(dto.Number);
+
+            if (insertedCount == 0)
+                return BadRequest("ժամանակավոր աղյուսակում տվյալներ չկան:");
+
             return Ok(insertedCount);
         }
     }

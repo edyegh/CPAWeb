@@ -10,9 +10,12 @@ namespace CPAWeb.Data.Interface
     public interface ISIDRepository
     {
         Task<SID?> GetSIDByNameAsync(string name);
-        Task<bool> AddSIDAsync(SID sid);
 
         Task<string?> GetFullNumberBySuffixAsync(string suffix);
 
+        // Ժամանակավոր աղյուսակ (edyeghiazaryan_insertvalue)
+        Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names);
+        Task<int> GetStagingCountAsync();
+        Task<int> TransferStagingToSIDAsync(string number);
     }
 }
