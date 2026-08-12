@@ -86,14 +86,14 @@
 
     <!-- Footer Actions -->
     <footer class="cpa-actions">
-        <button class="btn btn-success btn-custom me-3" @onclick="OpenAddNameModal">
-            <i class="bi bi-plus-lg me-1"></i> add new name
-        </button>
-
-        <label for="excel-upload-input" class="btn btn-outline-success btn-custom m-0">
+        <label for="excel-upload-input" class="btn btn-outline-success btn-custom m-0 me-3">
             <i class="bi bi-file-earmark-excel me-1"></i> upload file
         </label>
         <InputFile id="excel-upload-input" OnChange="OnInputFileChange" accept=".xlsx" style="display:none;" />
+
+        <button class="btn btn-success btn-custom" @onclick="OpenAddNameModal">
+            <i class="bi bi-plus-lg me-1"></i> add new name
+        </button>
     </footer>
 </div>
 
@@ -392,7 +392,6 @@
                 expandedSheetNames.Remove(sheet.SheetName);
                 previewSheets.Remove(sheet);
             }
-            // else: show a message instead of silently removing
         }
 
         savingSheetNames.Remove(sheet.SheetName);

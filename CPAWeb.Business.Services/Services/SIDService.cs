@@ -97,8 +97,14 @@ namespace CPAWeb.Business.Services.Services
                 return 0;
             }
 
-            // Գտնում ենք բազայի Number-ը ըստ SheetName-ի
-            string? fullNumber = await _sidRepository.GetFullNumberBySuffixAsync(dto.SheetName);
+            // SheetName-ից ("Nikita 5124" կամ "5124") կառուցում ենք ամբողջական համարը՝ 37488005124
+            string? fullNumber = BuildFullNumber(dto.SheetName);
+
+            // Եթե SheetName-ում թվեր չկան, փորձում ենք գտնել բազայից
+            if (fullNumber == null)
+            {
+                fullNumber = await _sidRepository.GetFullNumberBySuffixAsync(dto.SheetName);
+            }
 
             int successCount = 0;
 
@@ -118,6 +124,37 @@ namespace CPAWeb.Business.Services.Services
             }
 
             return successCount;
+        }
+
+        // =========================================================================
+        // SHEET NAME -> ԱՄԲՈՂՋԱԿԱՆ ՀԱՄԱՐ
+        // "Nikita 5124" -> 37488005124 ; "5124" -> 37488005124
+        // =========================================================================
+        public const string NumberPrefix = "3748800";
+        public const int NumberLength = 11;
+
+        public static string? BuildFullNumber(string? sheetName)
+        {
+            if (string.IsNullOrWhiteSpace(sheetName))
+                return null;
+
+            // Վերցնում ենք անվան մեջ եղած վերջին թվային խումբը ("Nikita 5124" -> "5124")
+            var matches = System.Text.RegularExpressions.Regex.Matches(sheetName, @"\d+");
+            if (matches.Count == 0)
+                return null;
+
+            string digits = matches[matches.Count - 1].Value;
+
+            // Եթե արդեն ամբողջական համար է, թողնում ենք ինչպես կա
+            if (digits.Length >= NumberLength)
+                return digits.Substring(digits.Length - NumberLength);
+
+            int suffixLength = NumberLength - NumberPrefix.Length; // 4
+            string suffix = digits.Length > suffixLength
+                ? digits.Substring(digits.Length - suffixLength)
+                : digits.PadLeft(suffixLength, '0');
+
+            return NumberPrefix + suffix;
         }
 
         // Դեղին գույնը ստուգող մեթոդը

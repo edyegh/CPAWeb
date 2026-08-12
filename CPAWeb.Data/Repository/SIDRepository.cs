@@ -25,13 +25,16 @@ namespace CPAWeb.Data.Repository
         {
             using (var connection = new SqlConnection(_connectionString))
             {
+                
+
                 var query = @"INSERT INTO cpa_sid (Name, Number) 
                       VALUES (@Name, @Number)";
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.Parameters.Add("@Name", SqlDbType.NVarChar, 11).Value = sid.Name;
-                    command.Parameters.Add("@Number", SqlDbType.NVarChar, 11).Value = sid.Number;
+                    // Առանց ֆիքսված չափի, որպեսզի երկար Name-երը լուռ չկտրվեն
+                    command.Parameters.Add("@Name", SqlDbType.NVarChar).Value = sid.Name;
+                    command.Parameters.Add("@Number", SqlDbType.NVarChar).Value = sid.Number;
 
                     await connection.OpenAsync();
                     int rowsAffected = await command.ExecuteNonQueryAsync();
@@ -74,7 +77,15 @@ namespace CPAWeb.Data.Repository
         {
             using (var connection = new SqlConnection(_connectionString))
             {
-                string cleanSuffix = suffix.Trim().Split(' ')[0];
+                // "Nikita 5124" -> "5124", "5124" -> "5124"
+                var digitGroups = System.Text.RegularExpressions.Regex.Matches(suffix ?? string.Empty, @"\d+");
+                string cleanSuffix = digitGroups.Count > 0
+                    ? digitGroups[digitGroups.Count - 1].Value
+                    : (suffix ?? string.Empty).Trim();
+
+                if (string.IsNullOrEmpty(cleanSuffix))
+                    return null;
+
                 // LIKE '%9008' պայմանով գտնում ենք ամբողջական Number-ը
                 var query = "SELECT TOP 1 Number FROM cpa_sid WHERE Number LIKE @Suffix";
 
