@@ -17,11 +17,34 @@ namespace CPAWeb.Business.Services.Services
     {
         private readonly ISIDRepository _sidRepository;
         private readonly IMapper _mapper;
+        private readonly IDuplicateNameLogger _duplicateLogger;
 
-        public SIDService(ISIDRepository sidRepository, IMapper mapper)
+        public SIDService(ISIDRepository sidRepository, IMapper mapper, IDuplicateNameLogger duplicateLogger)
         {
+
             _sidRepository = sidRepository ?? throw new ArgumentNullException(nameof(sidRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _duplicateLogger = duplicateLogger ?? throw new ArgumentNullException(nameof(duplicateLogger));
+        }
+
+        public string DuplicateNamesFilePath => _duplicateLogger.FilePath;
+
+        public Task<List<DuplicateNameDto>> GetDuplicateNamesAsync() => _duplicateLogger.ReadAllAsync();
+
+        public Task ClearDuplicateNamesAsync() => _duplicateLogger.ClearAsync();
+
+        // Ժամանակավոր աղյուսակ ավելացնելուց հետո պարտադիր SELECT ստուգում.
+        // արդեն գրանցված անունները գրանցում ենք .txt ֆայլում և վերադարձնում UI-ին
+        private async Task<List<string>> CheckStagedDuplicatesAsync(string source)
+        {
+            var duplicates = await _sidRepository.GetStagedNamesAlreadyInSIDAsync();
+
+            if (duplicates.Count > 0)
+            {
+                await _duplicateLogger.AppendAsync(duplicates, source);
+            }
+
+            return duplicates;
         }
 
         // "add new name" կոճակը նույնպես անցնում է ժամանակավոր աղյուսակով.
@@ -36,6 +59,9 @@ namespace CPAWeb.Business.Services.Services
             }
 
             await _sidRepository.ReplaceStagingNamesAsync(new[] { entity.Name });
+
+            // Պարտադիր ստուգում՝ արդյոք այս անունն արդեն գրանցված է
+            await CheckStagedDuplicatesAsync("add new name");
 
             int inserted = await CommitStagedNamesAsync(entity.Number);
             return inserted > 0;
@@ -115,6 +141,9 @@ namespace CPAWeb.Business.Services.Services
 
             // Ընտրված sheet-ի արժեքները դնում ենք ժամանակավոր աղյուսակի Name սյունակում
             result.StagedCount = await _sidRepository.ReplaceStagingNamesAsync(dto.Items);
+
+            // Պարտադիր ստուգում՝ որ անուններն արդեն գրանցված են cpa_sid-ում
+            result.DuplicateNames = await CheckStagedDuplicatesAsync(dto.SheetName);
 
             // SheetName-ից ("Nikita 5124" կամ "5124") առաջարկում ենք համարը՝ 37488005124
             result.SuggestedNumber = BuildFullNumber(dto.SheetName)

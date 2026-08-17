@@ -23,5 +23,10 @@ namespace CPAWeb.Services.Interface
 
         // 2. Ժամանակավոր աղյուսակի անունները գրանցում է cpa_sid-ում տրված համարով և մաքրում աղյուսակը
         Task<int> CommitStagedNamesAsync(string number);
+
+        // 3. Կրկնվող (արդեն գրանցված) անունների ցանկը
+        Task<List<DuplicateNameDto>> GetDuplicateNamesAsync();
+        Task ClearDuplicateNamesAsync();
+        string DuplicateNamesFilePath { get; }
     }
 }

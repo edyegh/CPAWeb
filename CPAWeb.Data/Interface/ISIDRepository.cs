@@ -16,6 +16,10 @@ namespace CPAWeb.Data.Interface
         // Ժամանակավոր աղյուսակ (edyeghiazaryan_insertvalue)
         Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names);
         Task<int> GetStagingCountAsync();
+
+        // Ստուգում է, թե ժամանակավոր աղյուսակի որ Name-երն արդեն գրանցված են cpa_sid-ում
+        Task<List<string>> GetStagedNamesAlreadyInSIDAsync();
+
         Task<int> TransferStagingToSIDAsync(string number);
     }
 }

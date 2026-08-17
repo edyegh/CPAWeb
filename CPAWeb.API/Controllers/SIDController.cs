@@ -79,5 +79,34 @@ namespace CPAWeb.API.Controllers
 
             return Ok(insertedCount);
         }
+
+        // 4. Արդեն գրանցված (կրկնվող) անունների ցանկը
+        [HttpGet("duplicates")]
+        public async Task<IActionResult> GetDuplicates()
+        {
+            var result = await _sidService.GetDuplicateNamesAsync();
+            return Ok(result);
+        }
+
+        // 5. Նույն ցանկը՝ .txt ֆայլով
+        [HttpGet("duplicates/file")]
+        public async Task<IActionResult> DownloadDuplicates()
+        {
+            string path = _sidService.DuplicateNamesFilePath;
+
+            if (!System.IO.File.Exists(path))
+                return NotFound("կրկնվող անուններ չկան:");
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(path);
+            return File(bytes, "text/plain", "duplicate-names.txt");
+        }
+
+        // 6. Ցանկի մաքրում
+        [HttpDelete("duplicates")]
+        public async Task<IActionResult> ClearDuplicates()
+        {
+            await _sidService.ClearDuplicateNamesAsync();
+            return NoContent();
+        }
     }
 }

@@ -47,7 +47,7 @@ namespace CPAWeb.Data.Repository
                             };
                         }
                     }
-                }
+                } 
             }
 
             return null;
@@ -109,6 +109,35 @@ namespace CPAWeb.Data.Repository
 
                 return result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
             }
+        }
+
+        // SELECT ստուգում. ժամանակավոր աղյուսակի որ անուններն արդեն կան cpa_sid-ում
+        public async Task<List<string>> GetStagedNamesAlreadyInSIDAsync()
+        {
+            var duplicates = new List<string>();
+
+            var query = $@"SELECT DISTINCT s.Name
+                           FROM {StagingTable} s
+                           INNER JOIN cpa_sid c ON c.Name = s.Name";
+
+            using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand(query, connection))
+            {
+                await connection.OpenAsync();
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        if (!reader.IsDBNull(0))
+                        {
+                            duplicates.Add(reader.GetString(0));
+                        }
+                    }
+                }
+            }
+
+            return duplicates;
         }
 
         // Ժամանակավոր աղյուսակի Name-երը գրանցում ենք cpa_sid-ում տրված Number-ով,

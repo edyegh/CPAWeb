@@ -28,6 +28,11 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(CPAWeb.Services.Profiles.MappingProfile).Assembly));
 // 2. Repository-ի և Service-ի գրանցում DI-ում
 builder.Services.AddScoped<ISIDRepository>(provider => new SIDRepository(connectionString));
+
+// Կրկնվող անունների .txt ֆայլը՝ App_Data/duplicate-names.txt
+string duplicatesFilePath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "duplicate-names.txt");
+builder.Services.AddSingleton<IDuplicateNameLogger>(provider => new DuplicateNameLogger(duplicatesFilePath));
+
 builder.Services.AddScoped<ISIDService, SIDService>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
