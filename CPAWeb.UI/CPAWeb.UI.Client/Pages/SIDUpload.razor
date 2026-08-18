@@ -36,26 +36,36 @@
 
     <!-- Main Content Area -->
     <main class="cpa-content">
-        @if (searchResult != null)
+        @if (searchResults.Any())
         {
             <div class="card result-card shadow-sm">
-                <div class="card-header bg-white border-bottom py-3">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
                     <h5 class="m-0 fw-bold text-secondary">search result</h5>
+                    <span class="badge bg-secondary">@searchResults.Count found</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th scope="col" style="width: 30%;">id</th>
-                                    <th scope="col" style="width: 70%;">name</th>
+                                    <th scope="col">provider</th>
+                                    <th scope="col">service name</th>
+                                    <th scope="col">up</th>
+                                    <th scope="col">service locator value</th>
+                                    <th scope="col">service id</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td><span class="badge bg-light text-dark fs-6 border">@searchResult.Number</span></td>
-                                    <td class="fw-bold text-dark">@searchResult.Name</td>
-                                </tr>
+                                @foreach (var row in searchResults)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-dark">@row.ProviderName</td>
+                                        <td>@row.ServiceName</td>
+                                        <td>@row.Up</td>
+                                        <td class="fw-semibold">@row.ServiceLocatorValue</td>
+                                        <td><span class="badge bg-light text-dark fs-6 border">@row.ServiceId</span></td>
+                                    </tr>
+                                }
                             </tbody>
                         </table>
                     </div>
@@ -359,7 +369,7 @@
     // Search State
     private string searchQuery = string.Empty;
     private string executedQuery = string.Empty;
-    private SIDDto? searchResult;
+    private List<SIDSearchResultDto> searchResults = new();
     private bool isSearching = false;
     private bool isNotFound = false;
     private bool hasSearched = false;
@@ -452,7 +462,7 @@
     {
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
-            searchResult = null;
+            searchResults = new();
             isNotFound = false;
             hasSearched = false;
             return;
@@ -465,16 +475,17 @@
 
         try
         {
-            searchResult = await Http.GetFromJsonAsync<SIDDto>($"api/sid/{Uri.EscapeDataString(searchQuery)}");
+            searchResults = await Http.GetFromJsonAsync<List<SIDSearchResultDto>>(
+                $"api/sid/{Uri.EscapeDataString(searchQuery)}") ?? new();
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            searchResult = null;
+            searchResults = new();
             isNotFound = true;
         }
         catch
         {
-            searchResult = null;
+            searchResults = new();
         }
         finally
         {

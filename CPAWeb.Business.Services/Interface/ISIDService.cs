@@ -13,7 +13,8 @@ namespace CPAWeb.Services.Interface
     public interface ISIDService
     {
         Task<bool> AddSIDAsync(CreateSIDDto createDto);
-        Task<SIDDto?> GetSIDByNameAsync(string name);
+        // Որոնում ըստ SERVICE_LOCATOR_VALUE-ի
+        Task<List<SIDSearchResultDto>> SearchAsync(string value);
 
         // Նոր մեթոդները
         Task<List<ExcelSheetPreviewDto>> ParseExcelPreviewAsync(IFormFile file);

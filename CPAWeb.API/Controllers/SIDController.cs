@@ -18,11 +18,11 @@ namespace CPAWeb.API.Controllers
         }
 
         [HttpGet("{name}")]
-        public async Task<ActionResult<SIDDto>> GetByName(string name)
+        public async Task<ActionResult<List<SIDSearchResultDto>>> Search(string name)
         {
-            var result = await _sidService.GetSIDByNameAsync(name);
+            var result = await _sidService.SearchAsync(name);
 
-            if (result == null)
+            if (result == null || result.Count == 0)
             {
                 return NotFound();
             }
@@ -41,7 +41,7 @@ namespace CPAWeb.API.Controllers
                 return BadRequest("Չհաջողվեց ավելացնել տվյալները:");
             }
 
-            return CreatedAtAction(nameof(GetByName), new { name = createDto.Name }, createDto);
+            return CreatedAtAction(nameof(Search), new { name = createDto.Name }, createDto);
         }
 
         [HttpPost("parse-preview")]

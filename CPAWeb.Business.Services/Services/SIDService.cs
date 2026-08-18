@@ -68,15 +68,15 @@ namespace CPAWeb.Business.Services.Services
             return inserted > 0;
         }
 
-        public async Task<SIDDto?> GetSIDByNameAsync(string name)
+        public async Task<List<SIDSearchResultDto>> SearchAsync(string value)
         {
-            if (string.IsNullOrWhiteSpace(name))
+            if (string.IsNullOrWhiteSpace(value))
             {
-                throw new ArgumentException("Name cannot be empty.", nameof(name));
+                throw new ArgumentException("Search value cannot be empty.", nameof(value));
             }
 
-            var entity = await _sidRepository.GetSIDByNameAsync(name);
-            return entity == null ? null : _mapper.Map<SIDDto>(entity);
+            var entities = await _sidRepository.SearchByServiceLocatorAsync(value.Trim());
+            return _mapper.Map<List<SIDSearchResultDto>>(entities);
         }
 
         // =========================================================================
@@ -164,8 +164,7 @@ namespace CPAWeb.Business.Services.Services
             result.DuplicateNames = await CheckStagedDuplicatesAsync(dto.SheetName);
 
             // SheetName-ից ("Nikita 5124" կամ "5124") առաջարկում ենք համարը՝ 37488005124
-            result.SuggestedNumber = BuildFullNumber(dto.SheetName)
-                                     ?? await _sidRepository.GetFullNumberBySuffixAsync(dto.SheetName);
+            result.SuggestedNumber = BuildFullNumber(dto.SheetName);
 
             return result;
         }

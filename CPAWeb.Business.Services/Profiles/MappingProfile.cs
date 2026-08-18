@@ -14,6 +14,8 @@ namespace CPAWeb.Services.Profiles
             CreateMap<SIDDto, SID>();
 
             CreateMap<CreateSIDDto, SID>();
+
+            CreateMap<SIDSearchResult, SIDSearchResultDto>();
         }
     }
 }

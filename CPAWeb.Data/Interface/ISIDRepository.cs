@@ -9,9 +9,8 @@ namespace CPAWeb.Data.Interface
 {
     public interface ISIDRepository
     {
-        Task<SID?> GetSIDByNameAsync(string name);
-
-        Task<string?> GetFullNumberBySuffixAsync(string suffix);
+        // Որոնում ըստ SERVICE_LOCATOR_VALUE-ի (CPA_NUMBER + CPA_SERVICE_IDENT + CPA_PROVIDER)
+        Task<List<SIDSearchResult>> SearchByServiceLocatorAsync(string value);
 
         // Ժամանակավոր աղյուսակ (edyeghiazaryan_insertvalue)
         Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names);
