@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -102,20 +103,37 @@ namespace CPAWeb.Business.Services.Services
 
                     int rowCount = worksheet.Dimension?.Rows ?? 0;
 
-                    // Տողերը կարդում ենք 1-ին կամ 2-րդ տողից (ըստ ձեր Excel structure-ի)
-                    for (int row = 1; row <= rowCount; row++)
-                    {
-                        var cell = worksheet.Cells[row, 1]; // Առաջին սյունակ (Column A)
+                    // Կարդում ենք ներքևից վերև՝ մինչև առաջին տողը, որը նարնջագույն չէ
+                    int row = rowCount;
 
-                        if (cell.Value != null && IsCellYellow(cell))
+                    // Բաց ենք թողնում վերջի դատարկ ու չգունավորված տողերը
+                    while (row >= 1)
+                    {
+                        var trailing = worksheet.Cells[row, 1]; // Առաջին սյունակ (Column A)
+
+                        if (trailing.Value != null || IsCellOrange(trailing))
+                            break;
+
+                        row--;
+                    }
+
+                    for (; row >= 1; row--)
+                    {
+                        var cell = worksheet.Cells[row, 1];
+
+                        // Առաջին ոչ նարնջագույն տողի վրա կանգ ենք առնում
+                        if (!IsCellOrange(cell))
+                            break;
+
+                        string val = cell.Value?.ToString()?.Trim() ?? "";
+                        if (!string.IsNullOrEmpty(val))
                         {
-                            string val = cell.Value.ToString()?.Trim() ?? "";
-                            if (!string.IsNullOrEmpty(val))
-                            {
-                                sheetDto.YellowRowFirstColumnValues.Add(val);
-                            }
+                            sheetDto.MarkedRowFirstColumnValues.Add(val);
                         }
                     }
+
+                    // Վերադարձնում ենք Excel-ի բնական հերթականությամբ (վերևից ներքև)
+                    sheetDto.MarkedRowFirstColumnValues.Reverse();
 
                     resultList.Add(sheetDto);
                 }
@@ -203,28 +221,72 @@ namespace CPAWeb.Business.Services.Services
             return NumberPrefix + suffix;
         }
 
-        // Դեղին գույնը ստուգող մեթոդը
-        private bool IsCellYellow(ExcelRange cell)
+        // Նարնջագույնը ստուգող մեթոդը
+        private bool IsCellOrange(ExcelRange cell)
         {
             var fill = cell.Style.Fill;
 
-            if (fill.PatternType == ExcelFillStyle.Solid)
+            if (fill.PatternType != ExcelFillStyle.Solid)
+                return false;
+
+            string? argb = GetFillArgb(fill.BackgroundColor);
+
+            if (string.IsNullOrEmpty(argb) || argb.Length < 6)
+                return false;
+
+            // Վերջին 6 նիշը՝ RRGGBB
+            string rgb = argb.Substring(argb.Length - 6);
+
+            if (!int.TryParse(rgb.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int r) ||
+                !int.TryParse(rgb.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int g) ||
+                !int.TryParse(rgb.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int b))
             {
-                string colorRgb = fill.BackgroundColor.Rgb;
-
-                if (!string.IsNullOrEmpty(colorRgb))
-                {
-                    return colorRgb.EndsWith("FFFF00", StringComparison.OrdinalIgnoreCase) ||
-                           colorRgb.EndsWith("FFFF99", StringComparison.OrdinalIgnoreCase);
-                }
-
-                if (fill.BackgroundColor.Indexed == 3 || fill.BackgroundColor.Indexed == 13)
-                {
-                    return true;
-                }
+                return false;
             }
 
-            return false;
+            return IsOrange(r, g, b);
+        }
+
+        // Theme/indexed գույների դեպքում Rgb-ն դատարկ է, ուստի փորձում ենք LookupColor()
+        private static string? GetFillArgb(ExcelColor color)
+        {
+            if (!string.IsNullOrEmpty(color.Rgb))
+                return color.Rgb;
+
+            try
+            {
+                return color.LookupColor()?.TrimStart('#');
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // Նարնջագույն = hue 10..50 աստիճան, բավարար հագեցվածությամբ
+        // (դեղինը՝ 60, կարմիրը՝ 0, դուրս են մնում)
+        private static bool IsOrange(int r, int g, int b)
+        {
+            int max = Math.Max(r, Math.Max(g, b));
+            int min = Math.Min(r, Math.Min(g, b));
+            int delta = max - min;
+
+            if (delta == 0 || max < 100)
+                return false;
+
+            double saturation = (double)delta / max;
+            if (saturation < 0.20)
+                return false;
+
+            // Նարնջագույնի դեպքում կարմիրը միշտ ամենամեծն է
+            if (max != r)
+                return false;
+
+            double hue = 60.0 * (((double)(g - b) / delta) % 6.0);
+            if (hue < 0)
+                hue += 360.0;
+
+            return hue >= 10.0 && hue <= 50.0;
         }
     }
 }

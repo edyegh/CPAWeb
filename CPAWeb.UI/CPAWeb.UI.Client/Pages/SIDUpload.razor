@@ -180,7 +180,7 @@
                                 @if (isExpanded)
                                 {
                                     <div class="card-body">
-                                        @if (sheet.YellowRowFirstColumnValues != null && sheet.YellowRowFirstColumnValues.Any())
+                                        @if (sheet.MarkedRowFirstColumnValues != null && sheet.MarkedRowFirstColumnValues.Any())
                                         {
                                             <div class="table-responsive mb-3">
                                                 <table class="table table-bordered table-hover align-middle mb-0">
@@ -191,11 +191,11 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @for (int i = 0; i < sheet.YellowRowFirstColumnValues.Count; i++)
+                                                        @for (int i = 0; i < sheet.MarkedRowFirstColumnValues.Count; i++)
                                                         {
                                                             <tr>
                                                                 <td><span class="badge bg-secondary">@(i + 1)</span></td>
-                                                                <td class="fw-semibold">@sheet.YellowRowFirstColumnValues[i]</td>
+                                                                <td class="fw-semibold">@sheet.MarkedRowFirstColumnValues[i]</td>
                                                             </tr>
                                                         }
                                                     </tbody>
@@ -568,7 +568,7 @@
         var request = new ImportSheetRequestDto
         {
             SheetName = sheet.SheetName,
-            Items = sheet.YellowRowFirstColumnValues
+            Items = sheet.MarkedRowFirstColumnValues
         };
 
         var response = await Http.PostAsJsonAsync("api/sid/import-sheet", request);

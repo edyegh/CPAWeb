@@ -1,3 +1,32 @@
+/* =========================================================================
+   TEAM TELECOM ARMENIA BRAND PALETTE
+   Երկու ֆիրմային գույն՝ վերցված team-telecom-logo.png-ից.
+     #01425F — մուգ կապույտ (wordmark)
+     #F04D4D — կորալ կարմիր (կետը)
+   Մնացած բոլոր երանգները ստացված են այս երկուսից և սպիտակից.
+   ========================================================================= */
+:root {
+    --tt-navy: #01425F;
+    --tt-navy-dark: #013247;
+    --tt-navy-deep: #011F2D;
+    --tt-navy-soft: #417187;
+    --tt-navy-muted: #4D7A8F;
+    --tt-navy-border: #CDD9DF;
+    --tt-navy-tint: #E6ECEF;
+    --tt-navy-tint-soft: #F3F6F8;
+
+    --tt-coral: #F04D4D;
+    --tt-coral-dark: #CC4141;
+    --tt-coral-border: #F8B5B5;
+    --tt-coral-tint: #FDE4E4;
+
+    --tt-white: #FFFFFF;
+}
+
+body {
+    color: var(--tt-navy);
+}
+
 .cpa-page-wrapper {
     width: 100%;
     padding: 2rem 2.5rem;
@@ -12,13 +41,13 @@
     gap: 1.5rem;
     margin-bottom: 2.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--tt-navy-border);
 }
 
 .brand-title {
     font-size: 1.75rem;
     font-weight: 800;
-    color: #1a1a1a;
+    color: var(--tt-navy);
     letter-spacing: -0.5px;
 }
 
@@ -45,7 +74,7 @@
 }
 
 .result-card {
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--tt-navy-border);
     border-radius: 10px;
     overflow: hidden;
 }
@@ -66,5 +95,314 @@
     align-items: center;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
+}
+
+/* =========================================================================
+   BOOTSTRAP-Ի ԳՈՒՅՆԵՐԻ ՎԵՐԱԳՐՈՒՄ ՖԻՐՄԱՅԻՆ ԳՈՒՅՆԵՐՈՎ
+   Կապույտը՝ հիմնական գործողություններ, կորալը՝ զգուշացում/ջնջում.
+   (Bootstrap 5.1-ը --bs-btn-* փոփոխականներ չունի, ուստի ուղիղ ենք գրում)
+   ========================================================================= */
+
+/* --- Հիմնական կոճակներ (կապույտ) --- */
+.btn-primary,
+.btn-success {
+    background-color: var(--tt-navy);
+    border-color: var(--tt-navy);
+    color: var(--tt-white);
+}
+
+    .btn-primary:hover,
+    .btn-success:hover,
+    .btn-primary:focus,
+    .btn-success:focus,
+    .btn-primary:active,
+    .btn-success:active,
+    .btn-primary.active,
+    .btn-success.active,
+    .show > .btn-primary.dropdown-toggle {
+        background-color: var(--tt-navy-dark);
+        border-color: var(--tt-navy-dark);
+        color: var(--tt-white);
+    }
+
+    .btn-primary:focus,
+    .btn-success:focus,
+    .btn-primary:active:focus,
+    .btn-success:active:focus {
+        box-shadow: 0 0 0 0.25rem rgba(1, 66, 95, 0.35);
+    }
+
+    .btn-primary:disabled,
+    .btn-success:disabled,
+    .btn-primary.disabled,
+    .btn-success.disabled {
+        background-color: var(--tt-navy-soft);
+        border-color: var(--tt-navy-soft);
+        color: var(--tt-white);
+    }
+
+/* --- Ուրվագծային կոճակներ (կապույտ) --- */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-secondary {
+    color: var(--tt-navy);
+    border-color: var(--tt-navy);
+    background-color: transparent;
+}
+
+    .btn-outline-primary:hover,
+    .btn-outline-success:hover,
+    .btn-outline-secondary:hover,
+    .btn-outline-primary:active,
+    .btn-outline-success:active,
+    .btn-outline-secondary:active {
+        color: var(--tt-white);
+        background-color: var(--tt-navy);
+        border-color: var(--tt-navy);
+    }
+
+    .btn-outline-primary:focus,
+    .btn-outline-success:focus,
+    .btn-outline-secondary:focus {
+        box-shadow: 0 0 0 0.25rem rgba(1, 66, 95, 0.25);
+    }
+
+    .btn-outline-primary.disabled,
+    .btn-outline-primary:disabled,
+    .btn-outline-success.disabled,
+    .btn-outline-success:disabled {
+        color: var(--tt-navy-soft);
+        border-color: var(--tt-navy-border);
+        background-color: transparent;
+    }
+
+/* --- Զգուշացում / ջնջում (կորալ) --- */
+.btn-warning,
+.btn-danger {
+    background-color: var(--tt-coral);
+    border-color: var(--tt-coral);
+    color: var(--tt-white);
+}
+
+    .btn-warning:hover,
+    .btn-danger:hover,
+    .btn-warning:focus,
+    .btn-danger:focus,
+    .btn-warning:active,
+    .btn-danger:active {
+        background-color: var(--tt-coral-dark);
+        border-color: var(--tt-coral-dark);
+        color: var(--tt-white);
+    }
+
+.btn-outline-warning,
+.btn-outline-danger {
+    color: var(--tt-coral-dark);
+    border-color: var(--tt-coral);
+    background-color: transparent;
+}
+
+    .btn-outline-warning:hover,
+    .btn-outline-danger:hover,
+    .btn-outline-warning:active,
+    .btn-outline-danger:active {
+        color: var(--tt-white);
+        background-color: var(--tt-coral);
+        border-color: var(--tt-coral);
+    }
+
+    .btn-outline-warning:focus,
+    .btn-outline-danger:focus {
+        box-shadow: 0 0 0 0.25rem rgba(240, 77, 77, 0.25);
+    }
+
+    .btn-outline-danger:disabled,
+    .btn-outline-danger.disabled,
+    .btn-outline-warning:disabled,
+    .btn-outline-warning.disabled {
+        color: var(--tt-coral-border);
+        border-color: var(--tt-coral-border);
+        background-color: transparent;
+    }
+
+/* --- Չեզոք կոճակներ --- */
+.btn-secondary {
+    background-color: var(--tt-navy-muted);
+    border-color: var(--tt-navy-muted);
+    color: var(--tt-white);
+}
+
+    .btn-secondary:hover,
+    .btn-secondary:focus,
+    .btn-secondary:active {
+        background-color: var(--tt-navy);
+        border-color: var(--tt-navy);
+        color: var(--tt-white);
+    }
+
+.btn-light {
+    background-color: var(--tt-navy-tint);
+    border-color: var(--tt-navy-border);
+    color: var(--tt-navy);
+}
+
+    .btn-light:hover,
+    .btn-light:focus,
+    .btn-light:active {
+        background-color: var(--tt-navy-border);
+        border-color: var(--tt-navy-border);
+        color: var(--tt-navy);
+    }
+
+/* --- Տեքստի գույներ --- */
+.text-primary,
+.text-success {
+    color: var(--tt-navy) !important;
+}
+
+.text-warning,
+.text-danger {
+    color: var(--tt-coral-dark) !important;
+}
+
+.text-secondary,
+.text-muted {
+    color: var(--tt-navy-muted) !important;
+}
+
+.text-dark,
+.modal-title,
+.card-header h5,
+.card-header h6 {
+    color: var(--tt-navy) !important;
+}
+
+a,
+.btn-link {
+    color: var(--tt-navy);
+}
+
+    a:hover,
+    .btn-link:hover {
+        color: var(--tt-navy-dark);
+    }
+
+/* --- Ֆոներ և նշիչներ --- */
+.bg-light {
+    background-color: var(--tt-navy-tint) !important;
+}
+
+.badge.bg-light {
+    color: var(--tt-navy) !important;
+    border-color: var(--tt-navy-border) !important;
+}
+
+.badge.bg-secondary {
+    background-color: var(--tt-navy) !important;
+    color: var(--tt-white) !important;
+}
+
+.badge.bg-warning {
+    background-color: var(--tt-coral) !important;
+    color: var(--tt-white) !important;
+}
+
+/* --- Ծանուցումներ --- */
+.alert-warning {
+    background-color: var(--tt-coral-tint);
+    border-color: var(--tt-coral-border);
+    color: var(--tt-coral-dark);
+}
+
+.alert-danger {
+    background-color: var(--tt-coral-tint);
+    border-color: var(--tt-coral);
+    color: var(--tt-coral-dark);
+}
+
+.alert-success,
+.alert-info {
+    background-color: var(--tt-navy-tint);
+    border-color: var(--tt-navy-border);
+    color: var(--tt-navy);
+}
+
+/* --- Աղյուսակներ --- */
+.table {
+    --bs-table-hover-bg: var(--tt-navy-tint-soft);
+    --bs-table-hover-color: var(--tt-navy);
+    color: var(--tt-navy);
+    border-color: var(--tt-navy-border);
+}
+
+.table-light,
+.table-light > th,
+.table-light > td,
+.table thead.table-light th {
+    background-color: var(--tt-navy-tint) !important;
+    color: var(--tt-navy) !important;
+    border-color: var(--tt-navy-border) !important;
+}
+
+.table-hover > tbody > tr:hover {
+    --bs-table-accent-bg: var(--tt-navy-tint-soft);
+    color: var(--tt-navy);
+}
+
+/* --- Ձևեր --- */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--tt-navy-soft);
+    box-shadow: 0 0 0 0.25rem rgba(1, 66, 95, 0.20);
+}
+
+.form-label,
+.form-control {
+    color: var(--tt-navy);
+}
+
+.input-group-text {
+    background-color: var(--tt-white);
+    border-color: var(--tt-navy-border);
+    color: var(--tt-navy-muted);
+}
+
+.form-control {
+    border-color: var(--tt-navy-border);
+}
+
+/* --- Քարտեր և մոդալներ --- */
+.card,
+.modal-content {
+    border-color: var(--tt-navy-border);
+}
+
+.card-header {
+    border-bottom-color: var(--tt-navy-border);
+}
+
+.modal-header,
+.modal-footer {
+    border-color: var(--tt-navy-border);
+}
+
+.modal-backdrop.show {
+    background-color: var(--tt-navy-deep);
+    opacity: 0.55;
+}
+
+.btn-close {
+    filter: none;
+}
+
+/* --- Սպասման ցուցիչներ --- */
+.spinner-border.text-primary,
+.spinner-border.text-success {
+    color: var(--tt-navy) !important;
+}
+
+.spinner-border.text-warning,
+.spinner-border.text-danger {
+    color: var(--tt-coral) !important;
 }
 

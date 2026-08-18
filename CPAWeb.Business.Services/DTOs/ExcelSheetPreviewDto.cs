@@ -9,6 +9,8 @@ namespace CPAWeb.Services.DTOs
     public class ExcelSheetPreviewDto
     {
         public string SheetName { get; set; } = string.Empty;
-        public List<string> YellowRowFirstColumnValues { get; set; } = new();
+
+        // Գունավորված (նարնջագույն) տողերի առաջին սյունակի արժեքները
+        public List<string> MarkedRowFirstColumnValues { get; set; } = new();
     }
 }
