@@ -293,7 +293,10 @@
                             <ul class="mb-0 ps-3 small" style="max-height: 140px; overflow-y: auto;">
                                 @foreach (var duplicate in stagedDuplicates)
                                 {
-                                    <li>@duplicate</li>
+                                    <li>
+                                        <strong>@duplicate.Name</strong>
+                                        <span class="text-muted">— already on @duplicate.RegisteredAt</span>
+                                    </li>
                                 }
                             </ul>
                         </div>
@@ -328,7 +331,7 @@
 {
     <div class="modal-backdrop fade show"></div>
     <div class="modal fade show d-block" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content shadow-lg border-0">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold">
@@ -349,9 +352,12 @@
                             <table class="table table-bordered table-hover align-middle mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width: 50%;">name</th>
-                                        <th style="width: 30%;">source</th>
-                                        <th style="width: 20%;">detected</th>
+                                        <th style="width: 26%;">name</th>
+                                        <th style="width: 20%;">registered on number</th>
+                                        <th style="width: 12%;">service id</th>
+                                        <th style="width: 16%;">provider</th>
+                                        <th style="width: 14%;">source</th>
+                                        <th style="width: 12%;">detected</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -359,6 +365,27 @@
                                     {
                                         <tr>
                                             <td class="fw-semibold">@duplicate.Name</td>
+                                            <td>
+                                                @if (string.IsNullOrEmpty(duplicate.ServiceName))
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="fw-semibold">@duplicate.ServiceName</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (string.IsNullOrEmpty(duplicate.ServiceId))
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-dark border">@duplicate.ServiceId</span>
+                                                }
+                                            </td>
+                                            <td class="text-muted">@(string.IsNullOrEmpty(duplicate.ProviderName) ? "—" : duplicate.ProviderName)</td>
                                             <td class="text-muted">@duplicate.Source</td>
                                             <td class="text-muted small">@duplicate.DetectedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                                         </tr>
@@ -421,7 +448,7 @@
     private string stagedSheetName = string.Empty;
     private int stagedCount = 0;
     private ExcelSheetPreviewDto? stagedSheet;
-    private List<string> stagedDuplicates = new();
+    private List<DuplicateNameDto> stagedDuplicates = new();
 
     // Already Registered (duplicate) Names State
     private bool isDuplicatesModalOpen = false;

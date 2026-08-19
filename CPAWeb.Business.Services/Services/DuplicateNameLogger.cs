@@ -10,10 +10,14 @@ using CPAWeb.Services.Interface;
 namespace CPAWeb.Business.Services.Services
 {
     // Կրկնվող անունները պահում ենք պարզ .txt ֆայլում՝
-    // 2026-08-14T09:12:33Z | Nikita 5124 | ANUN
+    // 2026-08-14T09:12:33Z | Nikita 5124 | ANUN | 374088006492 | 2582 | Provider
+    // (timestamp | source | name | service_name | service_id | provider)
+    //
+    // Հին՝ 3 դաշտանոց տողերը (առանց գրանցման տեղի) նույնպես կարդացվում են.
     public class DuplicateNameLogger : IDuplicateNameLogger
     {
         private const string Separator = " | ";
+        private const int FieldCount = 6;
 
         private static readonly SemaphoreSlim FileLock = new SemaphoreSlim(1, 1);
 
@@ -27,19 +31,29 @@ namespace CPAWeb.Business.Services.Services
             FilePath = filePath;
         }
 
-        public async Task AppendAsync(IEnumerable<string> names, string source)
+        // Դաշտի մեջ եղած "|"-ը կկոտրեր Split-ը, ուստի փոխարինում ենք
+        private static string Clean(string? value)
+            => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim().Replace("|", "/");
+
+        public async Task AppendAsync(IEnumerable<DuplicateNameDto> duplicates, string source)
         {
-            var list = names?.Where(n => !string.IsNullOrWhiteSpace(n))
-                             .Select(n => n.Trim())
-                             .ToList() ?? new List<string>();
+            var list = duplicates?.Where(d => d != null && !string.IsNullOrWhiteSpace(d.Name))
+                                  .ToList() ?? new List<DuplicateNameDto>();
 
             if (list.Count == 0)
                 return;
 
             string timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
-            string cleanSource = string.IsNullOrWhiteSpace(source) ? "-" : source.Trim();
+            string cleanSource = Clean(source);
 
-            var lines = list.Select(name => string.Join(Separator, timestamp, cleanSource, name));
+            var lines = list.Select(d => string.Join(
+                Separator,
+                timestamp,
+                cleanSource,
+                Clean(d.Name),
+                Clean(d.ServiceName),
+                Clean(d.ServiceId),
+                Clean(d.ProviderName)));
 
             await FileLock.WaitAsync();
             try
@@ -57,6 +71,10 @@ namespace CPAWeb.Business.Services.Services
                 FileLock.Release();
             }
         }
+
+        // Գրելիս դատարկ դաշտը դարձել է "-", կարդալիս հետ ենք բերում
+        private static string Restore(string value)
+            => value == "-" ? string.Empty : value;
 
         public async Task<List<DuplicateNameDto>> ReadAllAsync()
         {
@@ -84,8 +102,23 @@ namespace CPAWeb.Business.Services.Services
 
                 var parts = line.Split(Separator);
 
-                if (parts.Length >= 3)
+                if (parts.Length >= FieldCount)
                 {
+                    DateTime.TryParse(parts[0], out var detectedAt);
+
+                    result.Add(new DuplicateNameDto
+                    {
+                        DetectedAt = detectedAt,
+                        Source = parts[1],
+                        Name = parts[2],
+                        ServiceName = Restore(parts[3]),
+                        ServiceId = Restore(parts[4]),
+                        ProviderName = Restore(parts[5])
+                    });
+                }
+                else if (parts.Length >= 3)
+                {
+                    // Հին ձևաչափ՝ առանց գրանցման տեղի
                     DateTime.TryParse(parts[0], out var detectedAt);
 
                     result.Add(new DuplicateNameDto

@@ -17,7 +17,7 @@ namespace CPAWeb.Services.DTOs
         // Sheet-ի անունից վերցված համարը ("Nikita 5124" -> "5124"), UI-ում կարելի է փոխել
         public string? SuggestedNumber { get; set; }
 
-        // Անուններ, որոնք արդեն գրանցված են
-        public List<string> DuplicateNames { get; set; } = new();
+        // Անուններ, որոնք արդեն գրանցված են՝ իրենց համարով և service_id-ով
+        public List<DuplicateNameDto> DuplicateNames { get; set; } = new();
     }
 }

@@ -233,21 +233,26 @@ namespace CPAWeb.Data.Repository
             }
         }
 
-        // SELECT ստուգում. ժամանակավոր աղյուսակի որ անուններն արդեն գրանցված են։
-        // Օգտագործում ենք որոնման նույն select-ը (CPA_NUMBER + CPA_SERVICE_IDENT + CPA_PROVIDER)
-        public async Task<List<string>> GetStagedNamesAlreadyInSIDAsync()
+        // SELECT ստուգում. ժամանակավոր աղյուսակի որ անուններն արդեն գրանցված են
+        // և ՈՐՏԵՂ (համար, service_id, provider):
+        //
+        // Առաջատար աղյուսակը CPA_SERVICE_IDENT-ն է — ճիշտ նույն ստուգումը, ինչ
+        // PL/SQL բլոկի "not in (select service_locator_value from cpa_service_ident)"-ը.
+        // CPA_NUMBER-ը LEFT JOIN է, որպեսզի համար չունեցող service-ը նույնպես երևա.
+        //
+        // Անունը կարող է գրանցված լինել մեկից ավելի ծառայությունում — այդ դեպքում
+        // վերադարձնում ենք բոլոր տողերը.
+        public async Task<List<RegisteredNameInfo>> GetStagedNamesAlreadyRegisteredAsync()
         {
-            var duplicates = new List<string>();
+            var duplicates = new List<RegisteredNameInfo>();
 
-            var query = $@"SELECT DISTINCT s.{StagingNameColumn}
+            var query = $@"SELECT DISTINCT s.{StagingNameColumn}, cn.SERVICE_NAME, cs.SERVICE_ID, cp.NAME
                            FROM {StagingTable} s
-                           WHERE EXISTS (
-                               SELECT 1
-                               FROM CPA_NUMBER cn
-                               LEFT JOIN CPA_SERVICE_IDENT cs ON cn.SERVICE_ID = cs.SERVICE_ID
-                               LEFT JOIN CPA_PROVIDER cp ON cp.N = cn.UP
-                               WHERE UPPER(cs.SERVICE_LOCATOR_VALUE) = UPPER(s.{StagingNameColumn})
-                           )";
+                           JOIN {CpaSchema}.CPA_SERVICE_IDENT cs
+                                ON UPPER(cs.SERVICE_LOCATOR_VALUE) = UPPER(s.{StagingNameColumn})
+                           LEFT JOIN {CpaSchema}.CPA_NUMBER cn ON cn.SERVICE_ID = cs.SERVICE_ID
+                           LEFT JOIN {CpaSchema}.CPA_PROVIDER cp ON cp.N = cn.UP
+                           ORDER BY s.{StagingNameColumn}";
 
             using (var connection = new OracleConnection(_connectionString))
             using (var command = CreateCommand(query, connection))
@@ -258,10 +263,16 @@ namespace CPAWeb.Data.Repository
                 {
                     while (await reader.ReadAsync())
                     {
-                        if (!reader.IsDBNull(0))
+                        if (reader.IsDBNull(0))
+                            continue;
+
+                        duplicates.Add(new RegisteredNameInfo
                         {
-                            duplicates.Add(reader.GetString(0));
-                        }
+                            LocatorValue = ReadText(reader, 0),
+                            ServiceName = ReadText(reader, 1),
+                            ServiceId = ReadText(reader, 2),
+                            ProviderName = ReadText(reader, 3)
+                        });
                     }
                 }
             }

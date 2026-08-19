@@ -29,7 +29,7 @@ namespace CPAWeb.Services.DTOs
         // Քանի անուն է իրականում գրանցվել cpa_service_ident-ում
         public int RegisteredCount { get; set; }
 
-        // Անուններ, որոնք արդեն գրանցված էին
-        public List<string> AlreadyRegistered { get; set; } = new();
+        // Անուններ, որոնք արդեն գրանցված էին՝ իրենց համարով և service_id-ով
+        public List<DuplicateNameDto> AlreadyRegistered { get; set; } = new();
     }
 }

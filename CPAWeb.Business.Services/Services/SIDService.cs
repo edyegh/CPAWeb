@@ -36,9 +36,20 @@ namespace CPAWeb.Business.Services.Services
 
         // Ժամանակավոր աղյուսակ ավելացնելուց հետո պարտադիր SELECT ստուգում.
         // արդեն գրանցված անունները գրանցում ենք .txt ֆայլում և վերադարձնում UI-ին
-        private async Task<List<string>> CheckStagedDuplicatesAsync(string source)
+        private async Task<List<DuplicateNameDto>> CheckStagedDuplicatesAsync(string source)
         {
-            var duplicates = await _sidRepository.GetStagedNamesAlreadyInSIDAsync();
+            var registered = await _sidRepository.GetStagedNamesAlreadyRegisteredAsync();
+
+            // Անունի կողքին պահում ենք նաև, թե ՈՐ համարի/ծառայության տակ է արդեն գրանցված
+            var duplicates = registered.Select(r => new DuplicateNameDto
+            {
+                Name = r.LocatorValue,
+                Source = source,
+                DetectedAt = DateTime.UtcNow,
+                ServiceName = r.ServiceName,
+                ServiceId = r.ServiceId,
+                ProviderName = r.ProviderName
+            }).ToList();
 
             if (duplicates.Count > 0)
             {
@@ -165,9 +176,20 @@ namespace CPAWeb.Business.Services.Services
             await RegisterStagedAsync(result);
 
             result.Success = result.RegisteredCount > 0;
-            result.Message = result.Success
-                ? $"'{name}' registered for service_id {result.ServiceId} / account_id {result.AccountId}."
-                : $"'{name}' is already registered in cpa_service_ident — nothing was inserted.";
+
+            if (result.Success)
+            {
+                result.Message = $"'{name}' registered for service_id {result.ServiceId} / account_id {result.AccountId}.";
+            }
+            else
+            {
+                // Ցույց ենք տալիս, թե ՈՐՏԵՂ է արդեն գրանցված
+                string where = string.Join("; ", result.AlreadyRegistered.Select(d => d.RegisteredAt));
+
+                result.Message = string.IsNullOrEmpty(where)
+                    ? $"'{name}' is already registered — nothing was inserted."
+                    : $"'{name}' is already registered on {where} — nothing was inserted.";
+            }
 
             return result;
         }

@@ -16,8 +16,8 @@ namespace CPAWeb.Data.Interface
         Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names);
         Task<int> GetStagingCountAsync();
 
-        // Ստուգում է, թե ժամանակավոր աղյուսակի որ Name-երն արդեն գրանցված են
-        Task<List<string>> GetStagedNamesAlreadyInSIDAsync();
+        // Ստուգում է, թե ժամանակավոր աղյուսակի որ Name-երն արդեն գրանցված են և որտեղ
+        Task<List<RegisteredNameInfo>> GetStagedNamesAlreadyRegisteredAsync();
 
         Task ClearStagingAsync();
 

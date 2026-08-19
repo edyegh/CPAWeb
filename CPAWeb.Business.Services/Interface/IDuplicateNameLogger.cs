@@ -10,7 +10,8 @@ namespace CPAWeb.Services.Interface
     {
         string FilePath { get; }
 
-        Task AppendAsync(IEnumerable<string> names, string source);
+        // Անունը + որտեղ է արդեն գրանցված (համար, service_id, provider)
+        Task AppendAsync(IEnumerable<DuplicateNameDto> duplicates, string source);
         Task<List<DuplicateNameDto>> ReadAllAsync();
         Task ClearAsync();
     }
