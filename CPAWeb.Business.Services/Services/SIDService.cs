@@ -54,13 +54,79 @@ namespace CPAWeb.Business.Services.Services
         // cpa_service_ident.traffic_type_id
         public const int TrafficTypeId = 1;
 
+        // Թողնում ենք միայն թվերը՝ "374 8800 5124" -> "37488005124"
+        private static string NormalizeNumber(string? number)
+            => new string((number ?? string.Empty).Where(char.IsDigit).ToArray());
+
         // =========================================================================
-        // "add new name" կոճակը
-        //   1) Number -> CPA_NUMBER (status = 1) -> SERVICE_ID + SERVICE_NAME
-        //   2) SERVICE_ID -> CPA_ACCOUNT_SERVICE_IDENT -> ACCOUNT_ID
-        //   3) Name -> edyeghiazaryan_insertvalue.locator_value
-        //   4) PL/SQL բլոկ՝ cpa_service_ident + cpa_account_service_ident + cpa_audit_trail
-        //   5) ժամանակավոր աղյուսակի մաքրում
+        // ԸՆԴՀԱՆՈՒՐ ՔԱՅԼ 1-2 (և "add new name"-ի, և Excel-ի համար)
+        //   Number -> CPA_NUMBER (status = 1) -> SERVICE_ID + SERVICE_NAME
+        //   SERVICE_ID -> CPA_ACCOUNT_SERVICE_IDENT -> ACCOUNT_ID
+        // Սխալի դեպքում լրացնում է result.Message-ը և վերադարձնում false
+        // =========================================================================
+        private async Task<bool> ResolveServiceAndAccountAsync(string number, AddNameResultDto result)
+        {
+            var services = await _sidRepository.FindServicesByNumberAsync(number);
+
+            if (services.Count == 0)
+            {
+                result.Message = $"no active service found for number '{number}'.";
+                return false;
+            }
+
+            var distinctServices = services.Select(s => s.ServiceId).Distinct().ToList();
+            if (distinctServices.Count > 1)
+            {
+                result.Message = $"number '{number}' matches several services ({string.Join(", ", distinctServices)}). " +
+                                  "please enter a more specific number.";
+                return false;
+            }
+
+            var service = services[0];
+
+            result.ServiceId = service.ServiceId;
+            result.ServiceName = service.ServiceName;
+            result.ProviderName = service.ProviderName;
+
+            var accountIds = await _sidRepository.GetAccountIdsForServiceAsync(service.ServiceId);
+
+            if (accountIds.Count == 0)
+            {
+                result.Message = $"no account found for service_id {service.ServiceId}.";
+                return false;
+            }
+
+            // Ամենաշատ գործածվող account-ը; մնացածները ցույց ենք տալիս UI-ում
+            result.AccountId = accountIds[0];
+            result.AccountCandidates = accountIds;
+
+            return true;
+        }
+
+        // =========================================================================
+        // ԸՆԴՀԱՆՈՒՐ ՔԱՅԼ 3 — PL/SQL բլոկը ժամանակավոր աղյուսակի բոլոր տողերի վրա.
+        // cpa_service_ident + cpa_account_service_ident + cpa_audit_trail
+        // =========================================================================
+        private async Task RegisterStagedAsync(AddNameResultDto result)
+        {
+            try
+            {
+                result.RegisteredCount = await _sidRepository.RegisterStagedNamesAsync(
+                    result.ServiceId,
+                    result.AccountId,
+                    result.ServiceName,
+                    AuditUserName,
+                    TrafficTypeId);
+            }
+            finally
+            {
+                // Ժամանակավոր աղյուսակը միշտ մաքրում ենք
+                await _sidRepository.ClearStagingAsync();
+            }
+        }
+
+        // =========================================================================
+        // "add new name" կոճակը — 1 անուն
         // =========================================================================
         public async Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto)
         {
@@ -77,75 +143,77 @@ namespace CPAWeb.Business.Services.Services
             }
 
             string name = createDto.Name.Trim();
-            string number = new string(createDto.Number.Where(char.IsDigit).ToArray());
+            string number = NormalizeNumber(createDto.Number);
 
             if (number.Length == 0)
             {
                 throw new ArgumentException("Number must contain digits.", nameof(createDto));
             }
 
-            // --- 1. Համարից՝ service_id ---
-            var services = await _sidRepository.FindServicesByNumberAsync(number);
-
-            if (services.Count == 0)
+            if (!await ResolveServiceAndAccountAsync(number, result))
             {
-                result.Message = $"no active service found for number '{number}'.";
                 return result;
             }
 
-            var distinctServices = services.Select(s => s.ServiceId).Distinct().ToList();
-            if (distinctServices.Count > 1)
-            {
-                result.Message = $"number '{number}' matches several services ({string.Join(", ", distinctServices)}). " +
-                                  "please enter a more specific number.";
-                return result;
-            }
-
-            var service = services[0];
-
-            result.ServiceId = service.ServiceId;
-            result.ServiceName = service.ServiceName;
-            result.ProviderName = service.ProviderName;
-
-            // --- 2. service_id-ից՝ account_id ---
-            var accountIds = await _sidRepository.GetAccountIdsForServiceAsync(service.ServiceId);
-
-            if (accountIds.Count == 0)
-            {
-                result.Message = $"no account found for service_id {service.ServiceId}.";
-                return result;
-            }
-
-            // Ամենաշատ գործածվող account-ը; մնացածները ցույց ենք տալիս UI-ում
-            result.AccountId = accountIds[0];
-            result.AccountCandidates = accountIds;
-
-            // --- 3. Անունը ժամանակավոր աղյուսակում ---
+            // Անունը ժամանակավոր աղյուսակում
             await _sidRepository.ReplaceStagingNamesAsync(new[] { name });
+            result.StagedCount = 1;
 
             // Պարտադիր ստուգում՝ արդյոք այս անունն արդեն գրանցված է
             result.AlreadyRegistered = await CheckStagedDuplicatesAsync("add new name");
 
-            // --- 4. Գրանցում ---
-            try
-            {
-                result.RegisteredCount = await _sidRepository.RegisterStagedNamesAsync(
-                    service.ServiceId,
-                    result.AccountId,
-                    service.ServiceName,
-                    AuditUserName,
-                    TrafficTypeId);
-            }
-            finally
-            {
-                // --- 5. Ժամանակավոր աղյուսակը միշտ մաքրում ենք ---
-                await _sidRepository.ClearStagingAsync();
-            }
+            await RegisterStagedAsync(result);
 
             result.Success = result.RegisteredCount > 0;
             result.Message = result.Success
-                ? $"'{name}' registered for service_id {service.ServiceId} / account_id {result.AccountId}."
+                ? $"'{name}' registered for service_id {result.ServiceId} / account_id {result.AccountId}."
                 : $"'{name}' is already registered in cpa_service_ident — nothing was inserted.";
+
+            return result;
+        }
+
+        // =========================================================================
+        // EXCEL — ժամանակավոր աղյուսակում արդեն դրված sheet-ի անունները գրանցում ենք
+        // նույն տրամաբանությամբ, ինչ "add new name"-ը (նույն PL/SQL բլոկը)
+        // =========================================================================
+        public async Task<AddNameResultDto> CommitStagedNamesAsync(CommitStagedRequestDto dto)
+        {
+            var result = new AddNameResultDto();
+
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Number))
+            {
+                throw new ArgumentException("Number cannot be empty.", nameof(dto));
+            }
+
+            string number = NormalizeNumber(dto.Number);
+
+            if (number.Length == 0)
+            {
+                throw new ArgumentException("Number must contain digits.", nameof(dto));
+            }
+
+            // Ժամանակավոր աղյուսակը պետք է դատարկ չլինի
+            result.StagedCount = await _sidRepository.GetStagingCountAsync();
+
+            if (result.StagedCount == 0)
+            {
+                result.Message = "the staging table is empty — import a sheet first.";
+                return result;
+            }
+
+            if (!await ResolveServiceAndAccountAsync(number, result))
+            {
+                return result;
+            }
+
+            await RegisterStagedAsync(result);
+
+            result.Success = result.RegisteredCount > 0;
+            result.Message = result.Success
+                ? $"{result.RegisteredCount} of {result.StagedCount} name(s) registered for " +
+                  $"service_id {result.ServiceId} / account_id {result.AccountId}."
+                : $"none of the {result.StagedCount} staged name(s) were registered — " +
+                   "they are already in cpa_service_ident.";
 
             return result;
         }
@@ -245,7 +313,28 @@ namespace CPAWeb.Business.Services.Services
             // Պարտադիր ստուգում՝ որ անուններն արդեն գրանցված են
             result.DuplicateNames = await CheckStagedDuplicatesAsync(dto.SheetName);
 
+            // Sheet-ի անունից առաջարկում ենք համարը ("Nikita 5124" -> "5124")
+            result.SuggestedNumber = ExtractNumberFromSheetName(dto.SheetName);
+
             return result;
+        }
+
+        // =========================================================================
+        // SHEET NAME -> ՀԱՄԱՐ
+        // Վերցնում ենք վերջին թվային խումբը ("Nikita 5124" -> "5124").
+        // Prefix-ը կառուցելու կարիք չկա. որոնումը գնում է
+        // CPA_NUMBER.SERVICE_NAME LIKE '%5124'-ով:
+        // =========================================================================
+        public static string? ExtractNumberFromSheetName(string? sheetName)
+        {
+            if (string.IsNullOrWhiteSpace(sheetName))
+                return null;
+
+            var matches = System.Text.RegularExpressions.Regex.Matches(sheetName, @"\d+");
+            if (matches.Count == 0)
+                return null;
+
+            return matches[matches.Count - 1].Value;
         }
 
         // Նարնջագույնը ստուգող մեթոդը

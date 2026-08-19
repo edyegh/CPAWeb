@@ -267,7 +267,7 @@
     </div>
 }
 
-<!-- 3. STAGED RESULT MODAL (sheet names -> edyeghiazaryan_insertvalue) -->
+<!-- 3. MAIN NUMBER MODAL (staged names -> cpa_service_ident) -->
 @if (isNumberModalOpen)
 {
     <div class="modal-backdrop fade show" style="z-index: 1060;"></div>
@@ -275,13 +275,13 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg border-0">
                 <div class="modal-header border-bottom-0 pb-0">
-                    <h5 class="modal-title fw-bold text-dark">names staged</h5>
+                    <h5 class="modal-title fw-bold text-dark">enter main number</h5>
                     <button type="button" class="btn-close" @onclick="CloseNumberModal"></button>
                 </div>
                 <div class="modal-body pt-4">
                     <p class="text-muted mb-3">
                         <strong>@stagedCount</strong> name(s) from sheet
-                        "<strong>@stagedSheetName</strong>" were written to the staging table.
+                        "<strong>@stagedSheetName</strong>" are ready to be registered.
                     </p>
                     @if (stagedDuplicates.Any())
                     {
@@ -299,14 +299,24 @@
                         </div>
                     }
 
-                    <div class="alert alert-info py-2 mb-0 small">
-                        <i class="bi bi-info-circle me-1"></i>
-                        bulk registration is not wired up yet — use "add new name" to register
-                        a single name into cpa_service_ident.
-                    </div>
+                    <label class="form-label fw-semibold text-secondary">number <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-lg fs-6" @bind="mainNumber" placeholder="6492 or 374088006492" />
+                    <div class="form-text">service_id and account_id are resolved from this number.</div>
+
+                    @if (!string.IsNullOrEmpty(commitError))
+                    {
+                        <div class="alert alert-danger py-2 mt-3 mb-0">@commitError</div>
+                    }
                 </div>
                 <div class="modal-footer border-top-0 pt-0">
-                    <button type="button" class="btn btn-secondary px-4" @onclick="CloseNumberModal">close</button>
+                    <button type="button" class="btn btn-light px-4" @onclick="CloseNumberModal">cancel</button>
+                    <button type="button" class="btn btn-success px-4" @onclick="CommitStagedNames" disabled="@isCommitting">
+                        @if (isCommitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        register names
+                    </button>
                 </div>
             </div>
         </div>
@@ -403,8 +413,11 @@
     private HashSet<string> expandedSheetNames = new();
     private List<string> savingSheetNames = new();
 
-    // Staged Result Modal State (sheet names -> edyeghiazaryan_insertvalue)
+    // Main Number Modal State (staged names -> cpa_service_ident)
     private bool isNumberModalOpen = false;
+    private bool isCommitting = false;
+    private string mainNumber = string.Empty;
+    private string commitError = string.Empty;
     private string stagedSheetName = string.Empty;
     private int stagedCount = 0;
     private ExcelSheetPreviewDto? stagedSheet;
@@ -621,11 +634,13 @@
             var result = await response.Content.ReadFromJsonAsync<StageSheetResultDto>();
             if (result != null && result.StagedCount > 0)
             {
-                // Քայլ 2. Ցույց ենք տալիս, թե ինչ է դրվել ժամանակավոր աղյուսակում
+                // Քայլ 2. Հարցնում ենք հիմնական համարը
                 stagedSheet = sheet;
                 stagedSheetName = sheet.SheetName;
                 stagedCount = result.StagedCount;
                 stagedDuplicates = result.DuplicateNames ?? new();
+                mainNumber = result.SuggestedNumber ?? string.Empty;
+                commitError = string.Empty;
                 isNumberModalOpen = true;
 
                 // Թարմացնում ենք արդեն գրանցված անունների ցանկը
@@ -636,6 +651,62 @@
         savingSheetNames.Remove(sheet.SheetName);
     }
 
+    // Քայլ 3. Ժամանակավոր աղյուսակից cpa_service_ident (նույն PL/SQL բլոկը, ինչ "add new name"-ը)
+    private async Task CommitStagedNames()
+    {
+        if (string.IsNullOrWhiteSpace(mainNumber))
+        {
+            commitError = "please enter the main number.";
+            return;
+        }
+
+        isCommitting = true;
+        commitError = string.Empty;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/sid/commit-staged",
+                new CommitStagedRequestDto { Number = mainNumber.Trim() });
+
+            // Ե՛վ 200-ի, և՛ 400-ի դեպքում պատասխանը նույն DTO-ն է
+            AddNameResultDto? result = null;
+            try
+            {
+                result = await response.Content.ReadFromJsonAsync<AddNameResultDto>();
+            }
+            catch
+            {
+                // ignored — ստորև ցույց ենք տալիս ընդհանուր սխալը
+            }
+
+            if (response.IsSuccessStatusCode && result is { Success: true })
+            {
+                addResult = result;
+
+                if (stagedSheet != null)
+                {
+                    expandedSheetNames.Remove(stagedSheet.SheetName);
+                    previewSheets.Remove(stagedSheet);
+                }
+
+                CloseNumberModal();
+
+                // Թարմացնում ենք արդեն գրանցված անունների ցանկը
+                await LoadDuplicates();
+            }
+            else
+            {
+                commitError = string.IsNullOrWhiteSpace(result?.Message)
+                    ? "չհաջողվեց գրանցել տվյալները:"
+                    : result!.Message;
+            }
+        }
+        finally
+        {
+            isCommitting = false;
+        }
+    }
+
     private void CloseNumberModal()
     {
         isNumberModalOpen = false;
@@ -643,6 +714,8 @@
         stagedSheetName = string.Empty;
         stagedCount = 0;
         stagedDuplicates = new();
+        mainNumber = string.Empty;
+        commitError = string.Empty;
     }
 
     private void ClosePreviewModal()

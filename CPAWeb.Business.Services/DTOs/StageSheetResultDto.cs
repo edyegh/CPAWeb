@@ -14,6 +14,9 @@ namespace CPAWeb.Services.DTOs
         // Քանի Name է գրանցվել edyeghiazaryan_insertvalue-ում
         public int StagedCount { get; set; }
 
+        // Sheet-ի անունից վերցված համարը ("Nikita 5124" -> "5124"), UI-ում կարելի է փոխել
+        public string? SuggestedNumber { get; set; }
+
         // Անուններ, որոնք արդեն գրանցված են
         public List<string> DuplicateNames { get; set; } = new();
     }

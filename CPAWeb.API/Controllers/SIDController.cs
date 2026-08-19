@@ -69,7 +69,24 @@ namespace CPAWeb.API.Controllers
             return Ok(result);
         }
 
-        // 3. Արդեն գրանցված (կրկնվող) անունների ցանկը
+        // 3. Ժամանակավոր աղյուսակի անունները գրանցել՝ համարից գտնելով service_id և account_id
+        [HttpPost("commit-staged")]
+        public async Task<ActionResult<AddNameResultDto>> CommitStaged([FromBody] CommitStagedRequestDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Number))
+                return BadRequest(new AddNameResultDto { Message = "number is required." });
+
+            var result = await _sidService.CommitStagedNamesAsync(dto);
+
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+
+        // 4. Արդեն գրանցված (կրկնվող) անունների ցանկը
         [HttpGet("duplicates")]
         public async Task<IActionResult> GetDuplicates()
         {
@@ -77,7 +94,7 @@ namespace CPAWeb.API.Controllers
             return Ok(result);
         }
 
-        // 4. Նույն ցանկը՝ .txt ֆայլով
+        // 5. Նույն ցանկը՝ .txt ֆայլով
         [HttpGet("duplicates/file")]
         public async Task<IActionResult> DownloadDuplicates()
         {
@@ -90,7 +107,7 @@ namespace CPAWeb.API.Controllers
             return File(bytes, "text/plain", "duplicate-names.txt");
         }
 
-        // 5. Ցանկի մաքրում
+        // 6. Ցանկի մաքրում
         [HttpDelete("duplicates")]
         public async Task<IActionResult> ClearDuplicates()
         {

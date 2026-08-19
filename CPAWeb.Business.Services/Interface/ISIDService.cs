@@ -23,7 +23,10 @@ namespace CPAWeb.Services.Interface
         // 1. Sheet-ի արժեքները դնում է ժամանակավոր աղյուսակում (edyeghiazaryan_insertvalue)
         Task<StageSheetResultDto> SaveSheetDataAsync(ImportSheetRequestDto dto);
 
-        // 2. Կրկնվող (արդեն գրանցված) անունների ցանկը
+        // 2. Ժամանակավոր աղյուսակի անունները գրանցում է նույն PL/SQL բլոկով, ինչ "add new name"-ը
+        Task<AddNameResultDto> CommitStagedNamesAsync(CommitStagedRequestDto dto);
+
+        // 3. Կրկնվող (արդեն գրանցված) անունների ցանկը
         Task<List<DuplicateNameDto>> GetDuplicateNamesAsync();
         Task ClearDuplicateNamesAsync();
         string DuplicateNamesFilePath { get; }

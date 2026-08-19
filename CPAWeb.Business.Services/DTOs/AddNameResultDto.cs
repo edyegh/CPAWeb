@@ -23,6 +23,9 @@ namespace CPAWeb.Services.DTOs
         // Եթե ծառայությանը կապված է մեկից ավելի account, բոլորը ցույց ենք տալիս UI-ում
         public List<long> AccountCandidates { get; set; } = new();
 
+        // Քանի անուն կար ժամանակավոր աղյուսակում
+        public int StagedCount { get; set; }
+
         // Քանի անուն է իրականում գրանցվել cpa_service_ident-ում
         public int RegisteredCount { get; set; }
 
