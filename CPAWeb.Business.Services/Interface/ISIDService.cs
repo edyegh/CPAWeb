@@ -12,7 +12,8 @@ namespace CPAWeb.Services.Interface
 {
     public interface ISIDService
     {
-        Task<bool> AddSIDAsync(CreateSIDDto createDto);
+        // "add new name" — համարից service_id, service_id-ից account_id, ապա գրանցում
+        Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto);
         // Որոնում ըստ SERVICE_LOCATOR_VALUE-ի
         Task<List<SIDSearchResultDto>> SearchAsync(string value);
 
@@ -22,10 +23,7 @@ namespace CPAWeb.Services.Interface
         // 1. Sheet-ի արժեքները դնում է ժամանակավոր աղյուսակում (edyeghiazaryan_insertvalue)
         Task<StageSheetResultDto> SaveSheetDataAsync(ImportSheetRequestDto dto);
 
-        // 2. Ժամանակավոր աղյուսակի անունները գրանցում է cpa_sid-ում տրված համարով և մաքրում աղյուսակը
-        Task<int> CommitStagedNamesAsync(string number);
-
-        // 3. Կրկնվող (արդեն գրանցված) անունների ցանկը
+        // 2. Կրկնվող (արդեն գրանցված) անունների ցանկը
         Task<List<DuplicateNameDto>> GetDuplicateNamesAsync();
         Task ClearDuplicateNamesAsync();
         string DuplicateNamesFilePath { get; }

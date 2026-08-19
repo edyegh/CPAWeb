@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dotnet build *)",
-      "Bash(dotnet remove *)"
+      "Bash(dotnet remove *)",
+      "PowerShell(dotnet build *)",
+      "PowerShell(dotnet sln *)"
     ]
   }
 }

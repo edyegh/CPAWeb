@@ -16,9 +16,19 @@ namespace CPAWeb.Data.Interface
         Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names);
         Task<int> GetStagingCountAsync();
 
-        // Ստուգում է, թե ժամանակավոր աղյուսակի որ Name-երն արդեն գրանցված են cpa_sid-ում
+        // Ստուգում է, թե ժամանակավոր աղյուսակի որ Name-երն արդեն գրանցված են
         Task<List<string>> GetStagedNamesAlreadyInSIDAsync();
 
-        Task<int> TransferStagingToSIDAsync(string number);
+        Task ClearStagingAsync();
+
+        // "add new name" — համարով գտնում ենք SERVICE_ID-ն (CPA_NUMBER, status = 1)
+        Task<List<ServiceLookup>> FindServicesByNumberAsync(string number);
+
+        // SERVICE_ID-ով գտնում ենք ACCOUNT_ID-ն (CPA_ACCOUNT_SERVICE_IDENT)
+        Task<List<long>> GetAccountIdsForServiceAsync(long serviceId);
+
+        // Ժամանակավոր աղյուսակի անունները գրանցում ենք cpa_service_ident /
+        // cpa_account_service_ident / cpa_audit_trail աղյուսակներում
+        Task<int> RegisterStagedNamesAsync(long serviceId, long accountId, string serviceName, string userName, int trafficTypeId);
     }
 }

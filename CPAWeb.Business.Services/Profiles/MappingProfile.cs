@@ -9,12 +9,6 @@ namespace CPAWeb.Services.Profiles
     {
         public MappingProfile()
         {
-            CreateMap<SID, SIDDto>();
-
-            CreateMap<SIDDto, SID>();
-
-            CreateMap<CreateSIDDto, SID>();
-
             CreateMap<SIDSearchResult, SIDSearchResultDto>();
         }
     }

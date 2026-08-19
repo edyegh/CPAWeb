@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace CPAWeb.Services.DTOs
 {
-    // Անուն, որն արդեն գրանցված էր cpa_sid-ում ժամանակավոր աղյուսակ ավելացնելու պահին
+    // Անուն, որն արդեն գրանցված էր ժամանակավոր աղյուսակ ավելացնելու պահին
     public class DuplicateNameDto
     {
         public string Name { get; set; } = string.Empty;

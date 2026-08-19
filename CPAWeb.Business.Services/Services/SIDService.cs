@@ -48,24 +48,106 @@ namespace CPAWeb.Business.Services.Services
             return duplicates;
         }
 
-        // "add new name" կոճակը նույնպես անցնում է ժամանակավոր աղյուսակով.
-        // 1) Name -> edyeghiazaryan_insertvalue, 2) -> cpa_sid տրված Number-ով, 3) TRUNCATE
-        public async Task<bool> AddSIDAsync(CreateSIDDto createDto)
-        {
-            var entity = _mapper.Map<SID>(createDto);
+        // cpa_audit_trail-ի user_name սյունակի արժեքը
+        public const string AuditUserName = "EdYeghiazaryan";
 
-            if (entity == null || string.IsNullOrWhiteSpace(entity.Name))
+        // cpa_service_ident.traffic_type_id
+        public const int TrafficTypeId = 1;
+
+        // =========================================================================
+        // "add new name" կոճակը
+        //   1) Number -> CPA_NUMBER (status = 1) -> SERVICE_ID + SERVICE_NAME
+        //   2) SERVICE_ID -> CPA_ACCOUNT_SERVICE_IDENT -> ACCOUNT_ID
+        //   3) Name -> edyeghiazaryan_insertvalue.locator_value
+        //   4) PL/SQL բլոկ՝ cpa_service_ident + cpa_account_service_ident + cpa_audit_trail
+        //   5) ժամանակավոր աղյուսակի մաքրում
+        // =========================================================================
+        public async Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto)
+        {
+            var result = new AddNameResultDto();
+
+            if (createDto == null || string.IsNullOrWhiteSpace(createDto.Name))
             {
                 throw new ArgumentException("Name cannot be empty.", nameof(createDto));
             }
 
-            await _sidRepository.ReplaceStagingNamesAsync(new[] { entity.Name });
+            if (string.IsNullOrWhiteSpace(createDto.Number))
+            {
+                throw new ArgumentException("Number cannot be empty.", nameof(createDto));
+            }
+
+            string name = createDto.Name.Trim();
+            string number = new string(createDto.Number.Where(char.IsDigit).ToArray());
+
+            if (number.Length == 0)
+            {
+                throw new ArgumentException("Number must contain digits.", nameof(createDto));
+            }
+
+            // --- 1. Համարից՝ service_id ---
+            var services = await _sidRepository.FindServicesByNumberAsync(number);
+
+            if (services.Count == 0)
+            {
+                result.Message = $"no active service found for number '{number}'.";
+                return result;
+            }
+
+            var distinctServices = services.Select(s => s.ServiceId).Distinct().ToList();
+            if (distinctServices.Count > 1)
+            {
+                result.Message = $"number '{number}' matches several services ({string.Join(", ", distinctServices)}). " +
+                                  "please enter a more specific number.";
+                return result;
+            }
+
+            var service = services[0];
+
+            result.ServiceId = service.ServiceId;
+            result.ServiceName = service.ServiceName;
+            result.ProviderName = service.ProviderName;
+
+            // --- 2. service_id-ից՝ account_id ---
+            var accountIds = await _sidRepository.GetAccountIdsForServiceAsync(service.ServiceId);
+
+            if (accountIds.Count == 0)
+            {
+                result.Message = $"no account found for service_id {service.ServiceId}.";
+                return result;
+            }
+
+            // Ամենաշատ գործածվող account-ը; մնացածները ցույց ենք տալիս UI-ում
+            result.AccountId = accountIds[0];
+            result.AccountCandidates = accountIds;
+
+            // --- 3. Անունը ժամանակավոր աղյուսակում ---
+            await _sidRepository.ReplaceStagingNamesAsync(new[] { name });
 
             // Պարտադիր ստուգում՝ արդյոք այս անունն արդեն գրանցված է
-            await CheckStagedDuplicatesAsync("add new name");
+            result.AlreadyRegistered = await CheckStagedDuplicatesAsync("add new name");
 
-            int inserted = await CommitStagedNamesAsync(entity.Number);
-            return inserted > 0;
+            // --- 4. Գրանցում ---
+            try
+            {
+                result.RegisteredCount = await _sidRepository.RegisterStagedNamesAsync(
+                    service.ServiceId,
+                    result.AccountId,
+                    service.ServiceName,
+                    AuditUserName,
+                    TrafficTypeId);
+            }
+            finally
+            {
+                // --- 5. Ժամանակավոր աղյուսակը միշտ մաքրում ենք ---
+                await _sidRepository.ClearStagingAsync();
+            }
+
+            result.Success = result.RegisteredCount > 0;
+            result.Message = result.Success
+                ? $"'{name}' registered for service_id {service.ServiceId} / account_id {result.AccountId}."
+                : $"'{name}' is already registered in cpa_service_ident — nothing was inserted.";
+
+            return result;
         }
 
         public async Task<List<SIDSearchResultDto>> SearchAsync(string value)
@@ -160,64 +242,10 @@ namespace CPAWeb.Business.Services.Services
             // Ընտրված sheet-ի արժեքները դնում ենք ժամանակավոր աղյուսակի Name սյունակում
             result.StagedCount = await _sidRepository.ReplaceStagingNamesAsync(dto.Items);
 
-            // Պարտադիր ստուգում՝ որ անուններն արդեն գրանցված են cpa_sid-ում
+            // Պարտադիր ստուգում՝ որ անուններն արդեն գրանցված են
             result.DuplicateNames = await CheckStagedDuplicatesAsync(dto.SheetName);
 
-            // SheetName-ից ("Nikita 5124" կամ "5124") առաջարկում ենք համարը՝ 37488005124
-            result.SuggestedNumber = BuildFullNumber(dto.SheetName);
-
             return result;
-        }
-
-        // =========================================================================
-        // 3. ԺԱՄԱՆԱԿԱՎՈՐ ԱՂՅՈՒՍԱԿԻՑ cpa_sid ԵՎ ՄԱՔՐՈՒՄ (TRUNCATE)
-        // =========================================================================
-        public async Task<int> CommitStagedNamesAsync(string number)
-        {
-            if (string.IsNullOrWhiteSpace(number))
-            {
-                throw new ArgumentException("Համարը դատարկ է:", nameof(number));
-            }
-
-            string cleanNumber = new string(number.Where(char.IsDigit).ToArray());
-
-            if (cleanNumber.Length == 0)
-            {
-                throw new ArgumentException("Համարը պետք է պարունակի թվեր:", nameof(number));
-            }
-
-            return await _sidRepository.TransferStagingToSIDAsync(cleanNumber);
-        }
-
-        // =========================================================================
-        // SHEET NAME -> ԱՄԲՈՂՋԱԿԱՆ ՀԱՄԱՐ
-        // "Nikita 5124" -> 37488005124 ; "5124" -> 37488005124
-        // =========================================================================
-        public const string NumberPrefix = "3748800";
-        public const int NumberLength = 11;
-
-        public static string? BuildFullNumber(string? sheetName)
-        {
-            if (string.IsNullOrWhiteSpace(sheetName))
-                return null;
-
-            // Վերցնում ենք անվան մեջ եղած վերջին թվային խումբը ("Nikita 5124" -> "5124")
-            var matches = System.Text.RegularExpressions.Regex.Matches(sheetName, @"\d+");
-            if (matches.Count == 0)
-                return null;
-
-            string digits = matches[matches.Count - 1].Value;
-
-            // Եթե արդեն ամբողջական համար է, թողնում ենք ինչպես կա
-            if (digits.Length >= NumberLength)
-                return digits.Substring(digits.Length - NumberLength);
-
-            int suffixLength = NumberLength - NumberPrefix.Length; // 4
-            string suffix = digits.Length > suffixLength
-                ? digits.Substring(digits.Length - suffixLength)
-                : digits.PadLeft(suffixLength, '0');
-
-            return NumberPrefix + suffix;
         }
 
         // Նարնջագույնը ստուգող մեթոդը

@@ -31,17 +31,21 @@ namespace CPAWeb.API.Controllers
         }
 
 
+        // 1. "add new name" — համարից service_id, service_id-ից account_id, ապա գրանցում
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateSIDDto createDto)
+        public async Task<ActionResult<AddNameResultDto>> Create([FromBody] CreateSIDDto createDto)
         {
-            var isSuccess = await _sidService.AddSIDAsync(createDto);
+            if (createDto == null || string.IsNullOrWhiteSpace(createDto.Name) || string.IsNullOrWhiteSpace(createDto.Number))
+                return BadRequest(new AddNameResultDto { Message = "name and number are required." });
 
-            if (!isSuccess)
+            var result = await _sidService.AddSIDAsync(createDto);
+
+            if (!result.Success)
             {
-                return BadRequest("Չհաջողվեց ավելացնել տվյալները:");
+                return BadRequest(result);
             }
 
-            return CreatedAtAction(nameof(Search), new { name = createDto.Name }, createDto);
+            return Ok(result);
         }
 
         [HttpPost("parse-preview")]
@@ -65,22 +69,7 @@ namespace CPAWeb.API.Controllers
             return Ok(result);
         }
 
-        // 3. Ժամանակավոր աղյուսակի անունները գրանցել cpa_sid-ում տրված համարով և մաքրել աղյուսակը
-        [HttpPost("commit-staged")]
-        public async Task<IActionResult> CommitStaged([FromBody] CommitStagedRequestDto dto)
-        {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.Number))
-                return BadRequest("համարը պարտադիր է:");
-
-            int insertedCount = await _sidService.CommitStagedNamesAsync(dto.Number);
-
-            if (insertedCount == 0)
-                return BadRequest("ժամանակավոր աղյուսակում տվյալներ չկան:");
-
-            return Ok(insertedCount);
-        }
-
-        // 4. Արդեն գրանցված (կրկնվող) անունների ցանկը
+        // 3. Արդեն գրանցված (կրկնվող) անունների ցանկը
         [HttpGet("duplicates")]
         public async Task<IActionResult> GetDuplicates()
         {
@@ -88,7 +77,7 @@ namespace CPAWeb.API.Controllers
             return Ok(result);
         }
 
-        // 5. Նույն ցանկը՝ .txt ֆայլով
+        // 4. Նույն ցանկը՝ .txt ֆայլով
         [HttpGet("duplicates/file")]
         public async Task<IActionResult> DownloadDuplicates()
         {
@@ -101,7 +90,7 @@ namespace CPAWeb.API.Controllers
             return File(bytes, "text/plain", "duplicate-names.txt");
         }
 
-        // 6. Ցանկի մաքրում
+        // 5. Ցանկի մաքրում
         [HttpDelete("duplicates")]
         public async Task<IActionResult> ClearDuplicates()
         {

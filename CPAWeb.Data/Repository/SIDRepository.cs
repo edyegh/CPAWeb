@@ -12,18 +12,13 @@ namespace CPAWeb.Data.Repository
 {
     public class SIDRepository : ISIDRepository
     {
-        // =====================================================================
-        // ORACLE-Ի ԱՆՎԱՆՈՒՄՆԵՐ
-        // NUMBER-ը Oracle-ում վերապահված բառ է, ուստի սյունակի անունը
-        // գրվում է չակերտներով. Եթե ձեր բազայում այլ անուն է (օր.՝ SID_NUMBER),
-        // բավական է փոխել միայն այս հաստատունը.
-        // =====================================================================
-        private const string SidTable = "cpa_sid";
-        private const string SidNameColumn = "name";
-        private const string SidNumberColumn = "\"NUMBER\"";
-
         private const string StagingTable = "edyeghiazaryan_insertvalue";
-        private const string StagingNameColumn = "name";
+
+        // Սյունակը վերանվանվել է name -> locator_value (տես db/002_rename_staging_name_column.sql)
+        private const string StagingNameColumn = "locator_value";
+
+        // Այն սխեման, որում գտնվում են CPA_SERVICE_IDENT / CPA_ACCOUNT_SERVICE_IDENT / CPA_AUDIT_TRAIL
+        private const string CpaSchema = "CPA_USER29";
 
         private readonly string _connectionString;
 
@@ -92,6 +87,92 @@ namespace CPAWeb.Data.Repository
 
             var value = reader.GetValue(ordinal);
             return value?.ToString() ?? string.Empty;
+        }
+
+        private static long ReadLong(System.Data.Common.DbDataReader reader, int ordinal)
+        {
+            if (reader.IsDBNull(ordinal))
+                return 0L;
+
+            return Convert.ToInt64(reader.GetValue(ordinal));
+        }
+
+        // =====================================================================
+        // 1. ՀԱՄԱՐՈՎ ԳՏՆՈՒՄ ԵՆՔ SERVICE_ID-Ն
+        //    select cp.name, cn.service_name, cn.service_id ... where cn.service_name like '%5124'
+        // =====================================================================
+        public async Task<List<ServiceLookup>> FindServicesByNumberAsync(string number)
+        {
+            var results = new List<ServiceLookup>();
+
+            string query = $@"SELECT DISTINCT cn.SERVICE_ID, cn.SERVICE_NAME, cp.NAME
+                             FROM {CpaSchema}.CPA_NUMBER cn
+                             LEFT JOIN {CpaSchema}.CPA_PROVIDER cp ON cp.N = cn.UP
+                             WHERE cn.SERVICE_NAME LIKE :pattern
+                               AND cn.STATUS = 1";
+
+            using (var connection = new OracleConnection(_connectionString))
+            using (var command = CreateCommand(query, connection))
+            {
+                // '5124' -> '%5124' ; ամբողջական համարը նույնպես աշխատում է
+                command.Parameters.Add("pattern", OracleDbType.NVarchar2).Value = "%" + number;
+
+                await connection.OpenAsync();
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        results.Add(new ServiceLookup
+                        {
+                            ServiceId = ReadLong(reader, 0),
+                            ServiceName = ReadText(reader, 1),
+                            ProviderName = ReadText(reader, 2)
+                        });
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        // =====================================================================
+        // 2. SERVICE_ID-ՈՎ ԳՏՆՈՒՄ ԵՆՔ ACCOUNT_ID-Ն
+        //    select s.service_ident_id, s.account_id from CPA_ACCOUNT_SERVICE_IDENT s
+        //    where s.SERVICE_IDENT_ID in (select c.ID from CPA_SERVICE_IDENT c where c.SERVICE_ID = ...)
+        //    Վերադարձնում ենք ըստ հանդիպելու հաճախականության՝ ամենաշատը գործածվածն առաջինը
+        // =====================================================================
+        public async Task<List<long>> GetAccountIdsForServiceAsync(long serviceId)
+        {
+            var accountIds = new List<long>();
+
+            string query = $@"SELECT s.ACCOUNT_ID
+                              FROM {CpaSchema}.CPA_ACCOUNT_SERVICE_IDENT s
+                              WHERE s.SERVICE_IDENT_ID IN (
+                                    SELECT c.ID
+                                    FROM {CpaSchema}.CPA_SERVICE_IDENT c
+                                    WHERE c.SERVICE_ID = :serviceId)
+                                AND s.ACCOUNT_ID IS NOT NULL
+                              GROUP BY s.ACCOUNT_ID
+                              ORDER BY COUNT(*) DESC, s.ACCOUNT_ID";
+
+            using (var connection = new OracleConnection(_connectionString))
+            using (var command = CreateCommand(query, connection))
+            {
+                command.Parameters.Add("serviceId", OracleDbType.Int64).Value = serviceId;
+
+                await connection.OpenAsync();
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        accountIds.Add(ReadLong(reader, 0));
+                    }
+                }
+            }
+
+            return accountIds;
         }
 
         // =========================================================================
@@ -188,41 +269,154 @@ namespace CPAWeb.Data.Repository
             return duplicates;
         }
 
-        // Ժամանակավոր աղյուսակի Name-երը գրանցում ենք cpa_sid-ում տրված Number-ով,
-        // ապա անմիջապես մաքրում ենք ժամանակավոր աղյուսակը
-        public async Task<int> TransferStagingToSIDAsync(string number)
+        public async Task ClearStagingAsync()
         {
             using (var connection = new OracleConnection(_connectionString))
+            using (var command = CreateCommand($"DELETE FROM {StagingTable}", connection))
             {
                 await connection.OpenAsync();
-
-                using (var transaction = connection.BeginTransaction())
-                {
-                    int inserted;
-
-                    var query = $@"INSERT INTO {SidTable} ({SidNameColumn}, {SidNumberColumn})
-                                   SELECT {StagingNameColumn}, :number FROM {StagingTable}";
-
-                    using (var command = CreateCommand(query, connection, transaction))
-                    {
-                        command.Parameters.Add("number", OracleDbType.NVarchar2).Value = number;
-                        inserted = await command.ExecuteNonQueryAsync();
-                    }
-
-                    if (inserted > 0)
-                    {
-                        // DELETE, ոչ թե TRUNCATE, որպեսզի գործարքը մնա ամբողջական
-                        using (var clear = CreateCommand($"DELETE FROM {StagingTable}", connection, transaction))
-                        {
-                            await clear.ExecuteNonQueryAsync();
-                        }
-                    }
-
-                    await transaction.CommitAsync();
-                    return inserted;
-                }
+                await command.ExecuteNonQueryAsync();
             }
         }
 
+
+        private const string RegisterStagedNamesBlock = $@"
+declare
+  v_service_id    number := :p_service_id;
+  v_traffic_type  number := :p_traffic_type;
+  v_account_id    number := :p_account_id;
+  v_new_id        number;
+  v_counter       number := 0;
+
+  v_user_name     varchar2(100) := :p_user_name;
+  v_servname      varchar2(100) := :p_serv_name;
+  v_provider_n    varchar2(100);
+  v_account_n     varchar2(100);
+
+  v_audit_id      number;
+begin
+
+  -- վերցնում ենք պրովայդերի տվյալները՝ provider_n և account_n
+  begin
+    select cpa.provider_n, cpa.account_n
+      into v_provider_n, v_account_n
+      from cpa_provider_account cpa
+     where cpa.account_id = v_account_id;
+  exception
+    when no_data_found then
+      v_provider_n := null;
+      v_account_n  := null;
+  end;
+
+  -- մուտքագրված անուններից վերցնում ենք նրանք, որոնք գրանցված չկան բազայում
+  for rec in (
+    select locator_value
+      from edyeghiazaryan_insertvalue
+     where locator_value is not null
+       and locator_value not in (select service_locator_value
+                                   from cpa_service_ident
+                                  where service_locator_value is not null)
+  ) loop
+
+    select {CpaSchema}.q_service_range.nextval into v_new_id from dual;
+
+    -- 1. ավելացնում ենք cpa_service_ident-ում
+    insert into {CpaSchema}.cpa_service_ident (
+      id, service_locator_type, service_locator_value, service_id, traffic_type_id
+    ) values (
+      v_new_id, 1, rec.locator_value, v_service_id, v_traffic_type
+    );
+
+    -- 2. ավելացնում ենք cpa_account_service_ident-ում
+    insert into {CpaSchema}.cpa_account_service_ident (
+      service_ident_id, account_id
+    ) values (
+      v_new_id, v_account_id
+    );
+
+    -- ամեն ցիկլի սկզբում բազայից վերցնում ենք այդ պահին եղած ամենավերջին ID-ն
+    select nvl(max(id), 0) into v_audit_id from {CpaSchema}.cpa_audit_trail;
+
+    -- տող 1: ent1 = 200, ent2 = 210
+    v_audit_id := v_audit_id + 1;
+    insert into {CpaSchema}.cpa_audit_trail (
+      id, user_name, op_time, ent1, ent1_id, ent1_ref, ent2, ent2_id, ent2_ref, op, old_value, new_value, region_id, note
+    ) values (
+      v_audit_id, v_user_name, sysdate, 200, v_servname, v_service_id, 210, rec.locator_value, v_new_id, 0, null, null, 2, null
+    );
+
+    -- տող 3: ent1 = 210, ent2 = 211
+    v_audit_id := v_audit_id + 1;
+    insert into {CpaSchema}.cpa_audit_trail (
+      id, user_name, op_time, ent1, ent1_id, ent1_ref, ent2, ent2_id, ent2_ref, op, old_value, new_value, region_id, note
+    ) values (
+      v_audit_id, v_user_name, sysdate, 210, rec.locator_value, v_new_id, 211, null, null, 0, null, 1, 2, null
+    );
+
+    -- տող 4: ent1 = 210, ent2 = 212
+    v_audit_id := v_audit_id + 1;
+    insert into {CpaSchema}.cpa_audit_trail (
+      id, user_name, op_time, ent1, ent1_id, ent1_ref, ent2, ent2_id, ent2_ref, op, old_value, new_value, region_id, note
+    ) values (
+      v_audit_id, v_user_name, sysdate, 210, rec.locator_value, v_new_id, 212, null, null, 0, null, rec.locator_value, 2, null
+    );
+
+    -- տող 5: ent1 = 210, ent2 = 214
+    v_audit_id := v_audit_id + 1;
+    insert into {CpaSchema}.cpa_audit_trail (
+      id, user_name, op_time, ent1, ent1_id, ent1_ref, ent2, ent2_id, ent2_ref, op, old_value, new_value, region_id, note
+    ) values (
+      v_audit_id, v_user_name, sysdate, 210, rec.locator_value, v_new_id, 214, null, null, 0, null, 'SMS', 2, null
+    );
+
+    -- տող 2: ent1 = 210, ent2 = 106
+    v_audit_id := v_audit_id + 1;
+    insert into {CpaSchema}.cpa_audit_trail (
+      id, user_name, op_time, ent1, ent1_id, ent1_ref, ent2, ent2_id, ent2_ref, op, old_value, new_value, region_id, note
+    ) values (
+      v_audit_id, v_user_name, sysdate, 210, rec.locator_value, v_new_id, 106, v_account_n, v_provider_n, 1, null, null, 2, null
+    );
+
+    v_counter := v_counter + 1;
+
+  end loop;
+
+  if v_counter > 0 then
+    commit;
+  end if;
+
+  :p_count := v_counter;
+
+exception
+  when others then
+    rollback;
+    raise;
+end;";
+
+        public async Task<int> RegisterStagedNamesAsync(long serviceId, long accountId, string serviceName, string userName, int trafficTypeId)
+        {
+            using (var connection = new OracleConnection(_connectionString))
+            using (var command = CreateCommand(RegisterStagedNamesBlock, connection))
+            {
+                command.Parameters.Add("p_service_id", OracleDbType.Int64).Value = serviceId;
+                command.Parameters.Add("p_traffic_type", OracleDbType.Int32).Value = trafficTypeId;
+                command.Parameters.Add("p_account_id", OracleDbType.Int64).Value = accountId;
+                command.Parameters.Add("p_user_name", OracleDbType.Varchar2, 100).Value = userName;
+                command.Parameters.Add("p_serv_name", OracleDbType.Varchar2, 100).Value = serviceName;
+
+                var countParameter = command.Parameters.Add("p_count", OracleDbType.Int32);
+                countParameter.Direction = ParameterDirection.Output;
+
+                await connection.OpenAsync();
+                await command.ExecuteNonQueryAsync();
+
+                var value = countParameter.Value;
+                if (value == null || value == DBNull.Value)
+                    return 0;
+
+                // Oracle-ի provider-ը վերադարձնում է OracleDecimal, ոչ թե int
+                return Convert.ToInt32(value.ToString());
+            }
+        }
     }
 }
