@@ -257,7 +257,7 @@ namespace CPAWeb.Business.Services.Services
         public async Task<List<ExcelSheetPreviewDto>> ParseExcelPreviewAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
-                throw new ArgumentException("Excel ֆայլը դատարկ է:");
+                throw new ArgumentException("the excel file is empty.");
 
             ExcelPackage.License.SetNonCommercialOrganization("CPAWeb");
 

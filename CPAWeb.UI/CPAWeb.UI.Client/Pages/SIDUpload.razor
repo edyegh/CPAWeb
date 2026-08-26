@@ -2,6 +2,9 @@
 @page "/"
 @using System.Net.Http.Headers
 @using CPAWeb.Services.DTOs
+@using CPAWeb.UI.Client.Layout
+@* Էջը հասանելի է միայն մուտք գործած օգտատերերին *@
+@attribute [Authorize]
 @inject HttpClient Http
 
 <div class="cpa-page-wrapper">
@@ -28,6 +31,8 @@
                 </button>
             </div>
         </div>
+
+        <UserMenu />
 
         <div class="telecom-logo-container">
             <img src="assets/images/team-telecom-logo.png" alt="team telecom armenia" class="telecom-logo-img" />
@@ -597,7 +602,7 @@
             else
             {
                 addError = string.IsNullOrWhiteSpace(result?.Message)
-                    ? "չհաջողվեց ավելացնել տվյալները:"
+                    ? "could not add the data."
                     : result!.Message;
             }
         }
@@ -724,7 +729,7 @@
             else
             {
                 commitError = string.IsNullOrWhiteSpace(result?.Message)
-                    ? "չհաջողվեց գրանցել տվյալները:"
+                    ? "could not register the data."
                     : result!.Message;
             }
         }

@@ -1,0 +1,138 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using CPAWeb.Services.DTOs
+@using CPAWeb.UI.Client.Auth
+@inject AuthService Auth
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>CPA — login</PageTitle>
+
+<div class="cpa-login-wrapper">
+    <div class="card cpa-login-card shadow-sm">
+        <div class="card-body p-4 p-md-5">
+
+            <div class="text-center mb-4">
+                <img src="assets/images/team-telecom-logo.png" alt="team telecom armenia" class="cpa-login-logo mb-3" />
+                <h1 class="brand-title mb-1">CPA</h1>
+                <p class="text-muted small mb-0">sign in with your credentials</p>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="alert alert-danger border-0 py-2" role="alert">
+                    <i class="bi bi-exclamation-triangle me-1"></i> @errorMessage
+                </div>
+            }
+
+            <EditForm Model="model" OnValidSubmit="HandleLoginAsync">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="login-name">email or username</label>
+                    <InputText id="login-name"
+                               class="form-control"
+                               autocomplete="username"
+                               placeholder="test or test@gmail.com"
+                               @bind-Value="model.Login" />
+                    <ValidationMessage For="() => model.Login" class="small text-danger" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold" for="login-password">password</label>
+                    <InputText id="login-password"
+                               type="password"
+                               class="form-control"
+                               autocomplete="current-password"
+                               @bind-Value="model.Password" />
+                    <ValidationMessage For="() => model.Password" class="small text-danger" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 fw-semibold py-2" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    }
+                    log in
+                </button>
+            </EditForm>
+
+            <p class="text-muted small text-center mt-4 mb-0">
+                access is granted by an administrator
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel model = new();
+
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    // Արդեն մուտք գործած օգտատիրոջը մուտքի էջում պահելու իմաստ չկա
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            NavigateAfterLogin();
+        }
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await Auth.LoginAsync(new LoginRequestDto
+            {
+                Login = model.Login,
+                Password = model.Password
+            });
+
+            if (!result.Success)
+            {
+                errorMessage = result.Message;
+                return;
+            }
+
+            NavigateAfterLogin();
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // Վերադառնում ենք այն էջը, որտեղից ուղղորդվել էինք:
+    // Արտաքին հասցեներ չենք ընդունում — միայն հավելվածի ներսի ճանապարհ:
+    private void NavigateAfterLogin()
+    {
+        var target = ReturnUrl?.Trim();
+
+        bool isLocal = !string.IsNullOrWhiteSpace(target)
+            && !target.StartsWith("//", StringComparison.Ordinal)
+            && !target.Contains("://", StringComparison.Ordinal);
+
+        Navigation.NavigateTo(isLocal ? target! : "/", replace: true);
+    }
+
+    private sealed class LoginModel
+    {
+        // Ընդունում ենք և՛ ամբողջական email-ը, և՛ միայն '@'-ից առաջվա մասը,
+        // ուստի [EmailAddress] ստուգում այստեղ չկա
+        [Required(ErrorMessage = "username is required.")]
+        public string Login { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "password is required.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

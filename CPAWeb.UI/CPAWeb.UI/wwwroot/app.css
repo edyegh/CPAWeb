@@ -67,6 +67,46 @@ body {
     object-fit: contain;
 }
 
+/* Ադմինի "users" կոճակը, ընթացիկ օգտատերը և ելքը՝ վերնագրի աջ մասում */
+.cpa-user-menu {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    white-space: nowrap;
+}
+
+.cpa-user-name {
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--tt-navy-muted);
+}
+
+/* Մուտքի էջ */
+.cpa-login-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+    background-color: var(--tt-navy-tint-soft);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.cpa-login-card {
+    width: 100%;
+    max-width: 26rem;
+    border: 1px solid var(--tt-navy-border);
+    border-radius: 12px;
+    background-color: var(--tt-white);
+}
+
+.cpa-login-logo {
+    height: 34px;
+    width: auto;
+    object-fit: contain;
+}
+
 /* Content Area */
 .cpa-content {
     min-height: 250px;

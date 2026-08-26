@@ -1,6 +1,32 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+@using CPAWeb.UI.Client.Auth
+@* [Authorize] էջերի պաշտպանությունը՝ չմուտք գործածին ուղղորդում ենք /login *@
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        @* Մուտք գործած է, բայց իրավունքը չի բավարարում (օր. ոչ ադմին) *@
+                        <div class="cpa-page-wrapper">
+                            <div class="alert alert-danger border-0 shadow-sm" role="alert">
+                                <span class="fw-bold">you do not have access to this page.</span>
+                                <span class="ms-1">administrator rights are required.</span>
+                            </div>
+                        </div>
+                    }
+                </NotAuthorized>
+                <Authorizing>
+                    <div class="cpa-page-wrapper text-muted">
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span> checking...
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+</CascadingAuthenticationState>

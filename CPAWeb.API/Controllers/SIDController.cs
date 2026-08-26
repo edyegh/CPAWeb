@@ -2,12 +2,15 @@
 using CPAWeb.Services.Interface;
 using CPAWeb.Services.DTOs;
 using CPAWeb.Services.Interface;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CPAWeb.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    // Բոլոր SID գործողությունները հասանելի են միայն մուտք գործած օգտատերերին
+    [Authorize]
     public class SIDController : ControllerBase
     {
         private readonly ISIDService _sidService;
@@ -52,7 +55,7 @@ namespace CPAWeb.API.Controllers
         public async Task<IActionResult> ParsePreview(IFormFile file)
         {
             if (file == null || file.Length == 0)
-                return BadRequest("excel ֆայլը դատարկ է:");
+                return BadRequest("the excel file is empty.");
 
             var result = await _sidService.ParseExcelPreviewAsync(file);
             return Ok(result);
@@ -63,7 +66,7 @@ namespace CPAWeb.API.Controllers
         public async Task<IActionResult> ImportSheet([FromBody] ImportSheetRequestDto dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.SheetName))
-                return BadRequest("անվավեր տվյալներ:");
+                return BadRequest("invalid data.");
 
             var result = await _sidService.SaveSheetDataAsync(dto);
             return Ok(result);
@@ -101,7 +104,7 @@ namespace CPAWeb.API.Controllers
             string path = _sidService.DuplicateNamesFilePath;
 
             if (!System.IO.File.Exists(path))
-                return NotFound("կրկնվող անուններ չկան:");
+                return NotFound("there are no duplicate names.");
 
             var bytes = await System.IO.File.ReadAllBytesAsync(path);
             return File(bytes, "text/plain", "duplicate-names.txt");
