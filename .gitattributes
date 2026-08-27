@@ -61,3 +61,8 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Git hooks must stay LF - a CRLF shebang breaks them on Windows (bad interpreter)
+###############################################################################
+.githooks/** text eol=lf

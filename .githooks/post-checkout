@@ -1,0 +1,29 @@
+#!/bin/sh
+# Ընտրում է .env ֆայլը ընթացիկ branch-ի անունով:
+#   master  -> .env.master   (prod)
+#   preprod -> .env.preprod
+#
+# post-checkout args: $1=prev HEAD  $2=new HEAD  $3=1 եթե branch checkout է (0 = file checkout)
+
+# Աշխատել միայն branch-ի փոխման ժամանակ, ոչ թե `git checkout -- <file>`-ի
+[ "$3" = "1" ] || exit 0
+
+# repo-ի արմատը (hook-ը կարող է կանչվել ենթապանակից)
+root=$(git rev-parse --show-toplevel) || exit 0
+cd "$root" || exit 0
+
+# detached HEAD -> ոչինչ չենք անում
+current_branch=$(git symbolic-ref --short -q HEAD) || exit 0
+
+case "$current_branch" in
+  master)  src=.env.master  ; label="Production" ;;
+  preprod) src=.env.preprod ; label="Preprod" ;;
+  *)       exit 0 ;;
+esac
+
+if [ -f "$src" ]; then
+    cp -f "$src" .env
+    echo "Switched to $current_branch: Loaded $label environment ($src -> .env)."
+else
+    echo "post-checkout: WARNING - $src not found, .env left unchanged." >&2
+fi
