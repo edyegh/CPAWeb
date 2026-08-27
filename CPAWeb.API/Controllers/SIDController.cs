@@ -1,4 +1,5 @@
-﻿using CPAWeb.Services.DTOs;
+﻿using CPAWeb.API.Auth;
+using CPAWeb.Services.DTOs;
 using CPAWeb.Services.Interface;
 using CPAWeb.Services.DTOs;
 using CPAWeb.Services.Interface;
@@ -18,6 +19,14 @@ namespace CPAWeb.API.Controllers
         public SIDController(ISIDService sidService)
         {
             _sidService = sidService;
+        }
+
+        // Ո՞ր օգտատերն է ավելացնում անունը — գրվում է cpa_audit_trail.user_name սյունակում
+        private string CurrentUserName()
+        {
+            return User.FindFirst(CpaClaimTypes.Name)?.Value
+                ?? User.FindFirst(CpaClaimTypes.Email)?.Value
+                ?? string.Empty;
         }
 
         [HttpGet("{name}")]
@@ -41,7 +50,7 @@ namespace CPAWeb.API.Controllers
             if (createDto == null || string.IsNullOrWhiteSpace(createDto.Name) || string.IsNullOrWhiteSpace(createDto.Number))
                 return BadRequest(new AddNameResultDto { Message = "name and number are required." });
 
-            var result = await _sidService.AddSIDAsync(createDto);
+            var result = await _sidService.AddSIDAsync(createDto, CurrentUserName());
 
             if (!result.Success)
             {
@@ -79,7 +88,7 @@ namespace CPAWeb.API.Controllers
             if (dto == null || string.IsNullOrWhiteSpace(dto.Number))
                 return BadRequest(new AddNameResultDto { Message = "number is required." });
 
-            var result = await _sidService.CommitStagedNamesAsync(dto);
+            var result = await _sidService.CommitStagedNamesAsync(dto, CurrentUserName());
 
             if (!result.Success)
             {

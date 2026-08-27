@@ -13,7 +13,8 @@ namespace CPAWeb.Services.Interface
     public interface ISIDService
     {
         // "add new name" — համարից service_id, service_id-ից account_id, ապա գրանցում
-        Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto);
+        // userName — մուտք գործած օգտատերը, գրվում է cpa_audit_trail.user_name սյունակում
+        Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto, string? userName);
         // Որոնում ըստ SERVICE_LOCATOR_VALUE-ի
         Task<List<SIDSearchResultDto>> SearchAsync(string value);
 
@@ -24,7 +25,7 @@ namespace CPAWeb.Services.Interface
         Task<StageSheetResultDto> SaveSheetDataAsync(ImportSheetRequestDto dto);
 
         // 2. Ժամանակավոր աղյուսակի անունները գրանցում է նույն PL/SQL բլոկով, ինչ "add new name"-ը
-        Task<AddNameResultDto> CommitStagedNamesAsync(CommitStagedRequestDto dto);
+        Task<AddNameResultDto> CommitStagedNamesAsync(CommitStagedRequestDto dto, string? userName);
 
         // 3. Կրկնվող (արդեն գրանցված) անունների ցանկը
         Task<List<DuplicateNameDto>> GetDuplicateNamesAsync();

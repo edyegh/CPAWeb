@@ -59,8 +59,19 @@ namespace CPAWeb.Business.Services.Services
             return duplicates;
         }
 
-        // cpa_audit_trail-ի user_name սյունակի արժեքը
-        public const string AuditUserName = "EdYeghiazaryan";
+        // cpa_audit_trail-ի user_name սյունակի արժեքը, երբ մուտք գործած օգտատերը հայտնի չէ
+        public const string UnknownUserName = "unknown";
+
+        // cpa_audit_trail.user_name-ը varchar2(100) է — երկար անունը կտրում ենք
+        private static string ResolveAuditUserName(string? userName)
+        {
+            string name = (userName ?? string.Empty).Trim();
+
+            if (name.Length == 0)
+                return UnknownUserName;
+
+            return name.Length > 100 ? name.Substring(0, 100) : name;
+        }
 
         // cpa_service_ident.traffic_type_id
         public const int TrafficTypeId = 1;
@@ -118,7 +129,7 @@ namespace CPAWeb.Business.Services.Services
         // ԸՆԴՀԱՆՈՒՐ ՔԱՅԼ 3 — PL/SQL բլոկը ժամանակավոր աղյուսակի բոլոր տողերի վրա.
         // cpa_service_ident + cpa_account_service_ident + cpa_audit_trail
         // =========================================================================
-        private async Task RegisterStagedAsync(AddNameResultDto result)
+        private async Task RegisterStagedAsync(AddNameResultDto result, string? userName)
         {
             try
             {
@@ -126,7 +137,7 @@ namespace CPAWeb.Business.Services.Services
                     result.ServiceId,
                     result.AccountId,
                     result.ServiceName,
-                    AuditUserName,
+                    ResolveAuditUserName(userName),
                     TrafficTypeId);
             }
             finally
@@ -139,7 +150,7 @@ namespace CPAWeb.Business.Services.Services
         // =========================================================================
         // "add new name" կոճակը — 1 անուն
         // =========================================================================
-        public async Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto)
+        public async Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto, string? userName)
         {
             var result = new AddNameResultDto();
 
@@ -173,7 +184,7 @@ namespace CPAWeb.Business.Services.Services
             // Պարտադիր ստուգում՝ արդյոք այս անունն արդեն գրանցված է
             result.AlreadyRegistered = await CheckStagedDuplicatesAsync("add new name");
 
-            await RegisterStagedAsync(result);
+            await RegisterStagedAsync(result, userName);
 
             result.Success = result.RegisteredCount > 0;
 
@@ -198,7 +209,7 @@ namespace CPAWeb.Business.Services.Services
         // EXCEL — ժամանակավոր աղյուսակում արդեն դրված sheet-ի անունները գրանցում ենք
         // նույն տրամաբանությամբ, ինչ "add new name"-ը (նույն PL/SQL բլոկը)
         // =========================================================================
-        public async Task<AddNameResultDto> CommitStagedNamesAsync(CommitStagedRequestDto dto)
+        public async Task<AddNameResultDto> CommitStagedNamesAsync(CommitStagedRequestDto dto, string? userName)
         {
             var result = new AddNameResultDto();
 
@@ -228,7 +239,7 @@ namespace CPAWeb.Business.Services.Services
                 return result;
             }
 
-            await RegisterStagedAsync(result);
+            await RegisterStagedAsync(result, userName);
 
             result.Success = result.RegisteredCount > 0;
             result.Message = result.Success
