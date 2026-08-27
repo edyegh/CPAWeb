@@ -10,6 +10,12 @@ using CPAWeb.Services.DTOs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using DotNetEnv;
+
+// .env.<profile> ֆայլի բեռնում — profile-ը վերցվում է CPAWEB_ENV-ից (default՝ "preprod"):
+// Ուշադրություն՝ DotNetEnv-ի Load()-ը առանց արգումենտի փնտրում է հենց ".env" անունով ֆայլ,
+// այսինքն ".env.preprod" / ".env.master"-ը ինքնաբերաբար ՉԻ բեռնվում:
+LoadDotEnvFile();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -78,7 +84,9 @@ var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<Jw
     ?? throw new InvalidOperationException("Configuration section 'Jwt' not found.");
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Key) || Encoding.UTF8.GetByteCount(jwtOptions.Key) < 32)
-    throw new InvalidOperationException("'Jwt:Key'-ը պետք է լինի առնվազն 32 բայթ (HMAC-SHA256).");
+    throw new InvalidOperationException(
+        "'Jwt:Key'-ը պետք է լինի առնվազն 32 բայթ (HMAC-SHA256): " +
+        "Ստուգեք, որ .env.<CPAWEB_ENV> ֆայլում կա Jwt__Key տողը և արժեքը վերցված է չակերտների մեջ:");
 
 if (jwtOptions.ExpiryMinutes <= 0)
     throw new InvalidOperationException("'Jwt:ExpiryMinutes'-ը պետք է լինի դրական թիվ.");
@@ -157,4 +165,27 @@ static async Task SeedAdminsAsync(WebApplication app)
     {
         logger.LogWarning(ex, "Ադմինների seed-ը ձախողվեց: Ստուգեք cpa_web_user աղյուսակի առկայությունը (db/003_create_web_users.sql).");
     }
+}
+
+// .env.<profile> ֆայլը փնտրում ենք ընթացիկ պանակից բարձրանալով դեպի solution-ի արմատ:
+// Ֆայլի բացակայությունը սխալ չէ — production-ում փոփոխականները գալիս են hosting միջավայրից:
+static void LoadDotEnvFile()
+{
+    string profile = Environment.GetEnvironmentVariable("CPAWEB_ENV") ?? "preprod";
+    string fileName = $".env.{profile}";
+
+    for (var dir = new DirectoryInfo(Directory.GetCurrentDirectory()); dir != null; dir = dir.Parent)
+    {
+        string path = Path.Combine(dir.FullName, fileName);
+
+        if (!File.Exists(path))
+            continue;
+
+        // NoClobber՝ արդեն սահմանված իրական միջավայրի փոփոխականները չվերագրելու համար
+        Env.NoClobber().Load(path);
+        Console.WriteLine($"[env] Բեռնվեց՝ {path}");
+        return;
+    }
+
+    Console.WriteLine($"[env] '{fileName}' չի գտնվել — օգտագործվում են միայն միջավայրի փոփոխականները:");
 }
