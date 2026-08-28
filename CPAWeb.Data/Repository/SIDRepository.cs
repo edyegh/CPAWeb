@@ -18,7 +18,7 @@ namespace CPAWeb.Data.Repository
         private const string StagingNameColumn = "locator_value";
 
         // Այն սխեման, որում գտնվում են CPA_SERVICE_IDENT / CPA_ACCOUNT_SERVICE_IDENT / CPA_AUDIT_TRAIL
-        private const string CpaSchema = "CPA_USER29";
+        private const string CpaSchema = "CPA_USER48";
 
         private readonly string _connectionString;
 

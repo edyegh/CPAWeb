@@ -82,6 +82,48 @@ body {
     color: var(--tt-navy-muted);
 }
 
+/* Օգտատիրոջ անունը կոճակ է — սեղմելիս ներքևում բացվում է ելքի կոճակը */
+.cpa-user-dropdown {
+    position: relative;
+}
+
+.cpa-user-name-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--tt-navy-muted);
+    cursor: pointer;
+}
+
+.cpa-user-name-btn:hover,
+.cpa-user-name-btn.is-open {
+    border-color: var(--tt-navy-border);
+    background-color: var(--tt-navy-tint-soft);
+}
+
+.cpa-user-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    z-index: 1050;
+    min-width: 100%;
+    padding: 0.4rem;
+    background-color: var(--tt-white);
+    border: 1px solid var(--tt-navy-border);
+    border-radius: 8px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Թափանցիկ շերտ՝ ցանկից դուրս սեղմելը փակելու համար */
+.cpa-user-dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
 /* Մուտքի էջ */
 .cpa-login-wrapper {
     display: flex;

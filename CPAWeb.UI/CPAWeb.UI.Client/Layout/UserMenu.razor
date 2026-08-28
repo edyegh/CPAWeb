@@ -15,21 +15,54 @@
 
     <AuthorizeView>
         <Authorized>
-            <span class="cpa-user-name small fw-semibold" title="@context.User.Identity?.Name">
-                <i class="bi bi-person-circle me-1"></i>@context.User.Identity?.Name
-            </span>
-            <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" @onclick="LogoutAsync">
-                <i class="bi bi-box-arrow-right me-1"></i> log out
-            </button>
+            @* Անվան վրա սեղմելիս ներքևում բացվում է ելքի կոճակը *@
+            <div class="cpa-user-dropdown">
+                <button type="button"
+                        class="cpa-user-name-btn small fw-semibold @(_menuOpen ? "is-open" : null)"
+                        title="@context.User.Identity?.Name"
+                        aria-expanded="@(_menuOpen ? "true" : "false")"
+                        @onclick="ToggleMenu">
+                    <i class="bi bi-person-circle me-1"></i>
+                    <span class="cpa-user-name">@context.User.Identity?.Name</span>
+                    <i class="bi @(_menuOpen ? "bi-chevron-up" : "bi-chevron-down") ms-1"></i>
+                </button>
+
+                @if (_menuOpen)
+                {
+                    <div class="cpa-user-dropdown-menu">
+                        <button type="button" class="btn btn-outline-danger btn-sm fw-semibold w-100" @onclick="LogoutAsync">
+                            <i class="bi bi-box-arrow-right me-1"></i> log out
+                        </button>
+                    </div>
+                }
+            </div>
         </Authorized>
     </AuthorizeView>
 </div>
 
+@* Բացված ցանկից դուրս սեղմելը փակում է այն *@
+@if (_menuOpen)
+{
+    <div class="cpa-user-dropdown-backdrop" @onclick="CloseMenu"></div>
+}
+
 @code {
-    private void GoToUsers() => Navigation.NavigateTo("users");
+    // Ելքի կոճակը բացվա՞ծ է
+    private bool _menuOpen;
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private void CloseMenu() => _menuOpen = false;
+
+    private void GoToUsers()
+    {
+        _menuOpen = false;
+        Navigation.NavigateTo("users");
+    }
 
     private async Task LogoutAsync()
     {
+        _menuOpen = false;
         await Auth.LogoutAsync();
         Navigation.NavigateTo("login", replace: true);
     }
