@@ -79,6 +79,62 @@ namespace CPAWeb.Data.Repository
             return results;
         }
 
+        // =====================================================================
+        // ՈՐՈՆՈՒՄ ԸՍՏ PROVIDER-Ի ՀԱՄԱՐԻ (cn.SERVICE_NAME)
+        // =====================================================================
+        public async Task<List<SIDSearchResult>> SearchByProviderNumberAsync(string number)
+        {
+            string query = @"SELECT cp.NAME, cn.SERVICE_NAME
+                             FROM CPA_PROVIDER cp
+                             RIGHT JOIN CPA_NUMBER cn ON cp.N = cn.UP
+                             WHERE cn.SERVICE_NAME LIKE :pattern";
+
+            return await SearchProvidersAsync(query, number);
+        }
+
+        // =====================================================================
+        // ՈՐՈՆՈՒՄ ԸՍՏ PROVIDER-Ի ԱՆՎԱՆ (cp.NAME, միայն ակտիվ համարները)
+        // =====================================================================
+        public async Task<List<SIDSearchResult>> SearchByProviderNameAsync(string name)
+        {
+            string query = @"SELECT cp.NAME, cn.SERVICE_NAME
+                             FROM CPA_PROVIDER cp
+                             LEFT JOIN CPA_NUMBER cn ON cp.N = cn.UP
+                             WHERE UPPER(cp.NAME) LIKE UPPER(:pattern)
+                               AND cn.STATUS = 1";
+
+            return await SearchProvidersAsync(query, name);
+        }
+
+        // Երկու provider-որոնումն էլ վերադարձնում են նույն երկու սյունակը
+        private async Task<List<SIDSearchResult>> SearchProvidersAsync(string query, string value)
+        {
+            var results = new List<SIDSearchResult>();
+
+            using (var connection = new OracleConnection(_connectionString))
+            using (var command = CreateCommand(query, connection))
+            {
+                // 'Nikita' -> '%Nikita%'
+                command.Parameters.Add("pattern", OracleDbType.NVarchar2).Value = "%" + value + "%";
+
+                await connection.OpenAsync();
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        results.Add(new SIDSearchResult
+                        {
+                            ProviderName = ReadText(reader, 0),
+                            ServiceName = ReadText(reader, 1)
+                        });
+                    }
+                }
+            }
+
+            return results;
+        }
+
         // Սյունակները կարող են լինել NUMBER, DATE կամ տեքստ — կարդում ենք անվտանգ
         private static string ReadText(System.Data.Common.DbDataReader reader, int ordinal)
         {

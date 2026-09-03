@@ -29,10 +29,12 @@ namespace CPAWeb.API.Controllers
                 ?? string.Empty;
         }
 
+        // type — SID (լռելյայն), ProviderNumber կամ ProviderName
         [HttpGet("{name}")]
-        public async Task<ActionResult<List<SIDSearchResultDto>>> Search(string name)
+        public async Task<ActionResult<List<SIDSearchResultDto>>> Search(
+            string name, [FromQuery] SearchType type = SearchType.Sid)
         {
-            var result = await _sidService.SearchAsync(name);
+            var result = await _sidService.SearchAsync(name, type);
 
             if (result == null || result.Count == 0)
             {

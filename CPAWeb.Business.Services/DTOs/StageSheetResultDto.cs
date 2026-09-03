@@ -19,5 +19,11 @@ namespace CPAWeb.Services.DTOs
 
         // Անուններ, որոնք արդեն գրանցված են՝ իրենց համարով և service_id-ով
         public List<DuplicateNameDto> DuplicateNames { get; set; } = new();
+
+        // Ոչ լատինատառ նիշ պարունակող արժեքները — այս դեպքում ոչինչ չի ներմուծվում
+        public List<string> InvalidNames { get; set; } = new();
+
+        // Ընդհանուր սխալի տեքստը UI-ի համար
+        public string Message { get; set; } = string.Empty;
     }
 }
