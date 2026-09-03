@@ -165,6 +165,16 @@ namespace CPAWeb.Business.Services.Services
             }
 
             string name = createDto.Name.Trim();
+
+            // Միայն լատինատառ անուն — '․'-ի (U+2024) պես նիշերը արգելված են
+            string? nameError = NameCharacterValidator.Validate(name);
+
+            if (nameError != null)
+            {
+                result.Message = nameError;
+                return result;
+            }
+
             string number = NormalizeNumber(createDto.Number);
 
             if (number.Length == 0)
@@ -251,14 +261,23 @@ namespace CPAWeb.Business.Services.Services
             return result;
         }
 
-        public async Task<List<SIDSearchResultDto>> SearchAsync(string value)
+        public async Task<List<SIDSearchResultDto>> SearchAsync(string value, SearchType type)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
                 throw new ArgumentException("Search value cannot be empty.", nameof(value));
             }
 
-            var entities = await _sidRepository.SearchByServiceLocatorAsync(value.Trim());
+            string trimmed = value.Trim();
+
+            // Որոնման տեսակը որոշում է, թե որ query-ն է աշխատելու
+            var entities = type switch
+            {
+                SearchType.ProviderNumber => await _sidRepository.SearchByProviderNumberAsync(trimmed),
+                SearchType.ProviderName => await _sidRepository.SearchByProviderNameAsync(trimmed),
+                _ => await _sidRepository.SearchByServiceLocatorAsync(trimmed)
+            };
+
             return _mapper.Map<List<SIDSearchResultDto>>(entities);
         }
 
@@ -337,6 +356,24 @@ namespace CPAWeb.Business.Services.Services
 
             if (dto == null || string.IsNullOrWhiteSpace(dto.SheetName) || dto.Items == null || !dto.Items.Any())
             {
+                return result;
+            }
+
+            // Excel-ից եկած արժեքները նույնպես պետք է լինեն միայն լատինատառ:
+            // Թեկուզ մեկ սխալ նիշի դեպքում ոչինչ չենք ներմուծում:
+            foreach (var item in dto.Items)
+            {
+                string? itemError = NameCharacterValidator.Validate(item?.Trim());
+
+                if (itemError != null)
+                {
+                    result.InvalidNames.Add(itemError);
+                }
+            }
+
+            if (result.InvalidNames.Count > 0)
+            {
+                result.Message = $"{result.InvalidNames.Count} value(s) contain non-english characters — nothing was imported.";
                 return result;
             }
 

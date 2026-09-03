@@ -12,6 +12,12 @@ namespace CPAWeb.Data.Interface
         // Որոնում ըստ SERVICE_LOCATOR_VALUE-ի (CPA_NUMBER + CPA_SERVICE_IDENT + CPA_PROVIDER)
         Task<List<SIDSearchResult>> SearchByServiceLocatorAsync(string value);
 
+        // Որոնում ըստ provider-ի համարի (cn.SERVICE_NAME)
+        Task<List<SIDSearchResult>> SearchByProviderNumberAsync(string number);
+
+        // Որոնում ըստ provider-ի անվան (cp.NAME, միայն cn.STATUS = 1)
+        Task<List<SIDSearchResult>> SearchByProviderNameAsync(string name);
+
         // Ժամանակավոր աղյուսակ (edyeghiazaryan_insertvalue)
         Task<int> ReplaceStagingNamesAsync(IEnumerable<string> names);
         Task<int> GetStagingCountAsync();

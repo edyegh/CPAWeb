@@ -6,6 +6,7 @@
 @* Էջը հասանելի է միայն մուտք գործած օգտատերերին *@
 @attribute [Authorize]
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 <div class="cpa-page-wrapper">
     <!-- Header Section -->
@@ -14,12 +15,19 @@
 
         <div class="search-container">
             <div class="input-group">
+                @* Որոնման տեսակը՝ SID / provider-ի համար / provider-ի անուն *@
+                <select class="form-select flex-grow-0 w-auto fw-semibold"
+                        @bind="searchType" @bind:after="OnSearchTypeChanged">
+                    <option value="@SearchType.Sid">by sid</option>
+                    <option value="@SearchType.ProviderNumber">by provider number</option>
+                    <option value="@SearchType.ProviderName">by provider name</option>
+                </select>
                 <span class="input-group-text bg-white border-end-0">
                     <i class="bi bi-search text-muted"></i>
                 </span>
                 <input type="text"
                        class="form-control border-start-0 shadow-none"
-                       placeholder="search by name..."
+                       placeholder="@SearchPlaceholder"
                        @bind="searchQuery"
                        @onkeyup="HandleKeyUp" />
                 <button class="btn btn-primary px-4 fw-semibold" @onclick="ExecuteSearch" disabled="@isSearching">
@@ -75,9 +83,13 @@
                                 <tr>
                                     <th scope="col">provider</th>
                                     <th scope="col">service name</th>
-                                    <th scope="col">up</th>
-                                    <th scope="col">service locator value</th>
-                                    <th scope="col">service id</th>
+                                    @* Provider-ի որոնումները վերադարձնում են միայն վերևի երկու սյունակը *@
+                                    @if (executedSearchType == SearchType.Sid)
+                                    {
+                                        <th scope="col">up</th>
+                                        <th scope="col">service locator value</th>
+                                        <th scope="col">service id</th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
@@ -86,9 +98,12 @@
                                     <tr>
                                         <td class="fw-bold text-dark">@row.ProviderName</td>
                                         <td>@row.ServiceName</td>
-                                        <td>@row.Up</td>
-                                        <td class="fw-semibold">@row.ServiceLocatorValue</td>
-                                        <td><span class="badge bg-light text-dark fs-6 border">@row.ServiceId</span></td>
+                                        @if (executedSearchType == SearchType.Sid)
+                                        {
+                                            <td>@row.Up</td>
+                                            <td class="fw-semibold">@row.ServiceLocatorValue</td>
+                                            <td><span class="badge bg-light text-dark fs-6 border">@row.ServiceId</span></td>
+                                        }
                                     </tr>
                                 }
                             </tbody>
@@ -199,6 +214,20 @@
                     }
                     else if (previewSheets != null && previewSheets.Any())
                     {
+                        @* Ոչ լատինատառ նիշերի սխալը — ոչ մի արժեք չի ներմուծվել *@
+                        @if (!string.IsNullOrEmpty(sheetError))
+                        {
+                            <div class="alert alert-danger border-0 shadow-sm" role="alert">
+                                <div class="fw-bold mb-1"><i class="bi bi-x-octagon me-1"></i> @sheetError</div>
+                                <ul class="mb-0 small">
+                                    @foreach (var invalid in invalidSheetNames)
+                                    {
+                                        <li>@invalid</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
                         @foreach (var sheet in previewSheets)
                         {
                             var isExpanded = expandedSheetNames.Contains(sheet.SheetName);
@@ -345,6 +374,13 @@
                     <button type="button" class="btn-close" @onclick="CloseDuplicatesModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(duplicatesDownloadError))
+                    {
+                        <div class="alert alert-danger border-0" role="alert">
+                            <i class="bi bi-x-octagon me-1"></i> @duplicatesDownloadError
+                        </div>
+                    }
+
                     @if (isLoadingDuplicates)
                     {
                         <div class="text-center my-4">
@@ -405,10 +441,19 @@
                     }
                 </div>
                 <div class="modal-footer">
-                    <a class="btn btn-outline-primary px-4 @(duplicateNames.Any() ? "" : "disabled")"
-                       href="@duplicatesFileUrl" target="_blank">
-                        <i class="bi bi-download me-1"></i> download .txt
-                    </a>
+                    <button type="button" class="btn btn-outline-primary px-4"
+                            disabled="@(!duplicateNames.Any() || isDownloadingDuplicates)"
+                            @onclick="DownloadDuplicatesFile">
+                        @if (isDownloadingDuplicates)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-download me-1"></i>
+                        }
+                        download .txt
+                    </button>
                     <button type="button" class="btn btn-outline-danger px-4"
                             disabled="@(!duplicateNames.Any())" @onclick="ClearDuplicates">
                         clear list
@@ -424,6 +469,25 @@
     // Search State
     private string searchQuery = string.Empty;
     private string executedQuery = string.Empty;
+
+    // Ընտրված որոնման տեսակը, և այն տեսակը, որով ցուցադրվող արդյունքներն են ստացվել
+    private SearchType searchType = SearchType.Sid;
+    private SearchType executedSearchType = SearchType.Sid;
+
+    private string SearchPlaceholder => searchType switch
+    {
+        SearchType.ProviderNumber => "search by provider number...",
+        SearchType.ProviderName => "search by provider name...",
+        _ => "search by name..."
+    };
+
+    // Տեսակը փոխելիս հին արդյունքները թաքցնում ենք, որ շփոթություն չլինի
+    private void OnSearchTypeChanged()
+    {
+        searchResults = new();
+        isNotFound = false;
+        hasSearched = false;
+    }
     private List<SIDSearchResultDto> searchResults = new();
     private bool isSearching = false;
     private bool isNotFound = false;
@@ -445,6 +509,10 @@
     private HashSet<string> expandedSheetNames = new();
     private List<string> savingSheetNames = new();
 
+    // Ոչ լատինատառ նիշերի սխալը sheet-ը ներմուծելիս
+    private string sheetError = string.Empty;
+    private List<string> invalidSheetNames = new();
+
     // Main Number Modal State (staged names -> cpa_service_ident)
     private bool isNumberModalOpen = false;
     private bool isCommitting = false;
@@ -459,7 +527,10 @@
     private bool isDuplicatesModalOpen = false;
     private bool isLoadingDuplicates = false;
     private List<DuplicateNameDto> duplicateNames = new();
-    private string duplicatesFileUrl => $"{Http.BaseAddress}api/sid/duplicates/file";
+
+    // .txt-ի ներբեռնման վիճակը
+    private bool isDownloadingDuplicates = false;
+    private string duplicatesDownloadError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -502,6 +573,41 @@
         if (response.IsSuccessStatusCode)
         {
             duplicateNames = new();
+            duplicatesDownloadError = string.Empty;
+        }
+    }
+
+    // Ֆայլը վերցնում ենք HttpClient-ով, որպեսզի Bearer token-ը գնա հարցման հետ,
+    // ապա բրաուզերին ենք տալիս blob-ի տեսքով: Սովորական <a href>-ը token չի կրում -> 401:
+    private async Task DownloadDuplicatesFile()
+    {
+        isDownloadingDuplicates = true;
+        duplicatesDownloadError = string.Empty;
+
+        try
+        {
+            var response = await Http.GetAsync("api/sid/duplicates/file");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                duplicatesDownloadError = (int)response.StatusCode == 404
+                    ? "there are no duplicate names yet — the file has not been created."
+                    : $"could not download the file (HTTP {(int)response.StatusCode}).";
+                return;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+
+            await JS.InvokeVoidAsync("cpaDownloadFile",
+                "duplicate-names.txt", "text/plain", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            duplicatesDownloadError = $"could not download the file: {ex.Message}";
+        }
+        finally
+        {
+            isDownloadingDuplicates = false;
         }
     }
 
@@ -528,11 +634,12 @@
         isNotFound = false;
         hasSearched = true;
         executedQuery = searchQuery;
+        executedSearchType = searchType;
 
         try
         {
             searchResults = await Http.GetFromJsonAsync<List<SIDSearchResultDto>>(
-                $"api/sid/{Uri.EscapeDataString(searchQuery)}") ?? new();
+                $"api/sid/{Uri.EscapeDataString(searchQuery)}?type={searchType}") ?? new();
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -622,6 +729,8 @@
         isPreviewModalOpen = true;
         expandedSheetNames.Clear();
         savingSheetNames.Clear();
+        sheetError = string.Empty;
+        invalidSheetNames = new();
 
         using var content = new MultipartFormDataContent();
         var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 10485760));
@@ -653,6 +762,8 @@
     private async Task ImportSheet(ExcelSheetPreviewDto sheet)
     {
         savingSheetNames.Add(sheet.SheetName);
+        sheetError = string.Empty;
+        invalidSheetNames = new();
 
         var request = new ImportSheetRequestDto
         {
@@ -664,7 +775,14 @@
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadFromJsonAsync<StageSheetResultDto>();
-            if (result != null && result.StagedCount > 0)
+
+            // Ոչ լատինատառ նիշ — ոչինչ չի ներմուծվել, ցույց ենք տալիս սխալները
+            if (result != null && result.InvalidNames.Any())
+            {
+                sheetError = result.Message;
+                invalidSheetNames = result.InvalidNames;
+            }
+            else if (result != null && result.StagedCount > 0)
             {
                 // Քայլ 2. Հարցնում ենք հիմնական համարը
                 stagedSheet = sheet;

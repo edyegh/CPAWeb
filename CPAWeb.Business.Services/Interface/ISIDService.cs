@@ -15,8 +15,8 @@ namespace CPAWeb.Services.Interface
         // "add new name" — համարից service_id, service_id-ից account_id, ապա գրանցում
         // userName — մուտք գործած օգտատերը, գրվում է cpa_audit_trail.user_name սյունակում
         Task<AddNameResultDto> AddSIDAsync(CreateSIDDto createDto, string? userName);
-        // Որոնում ըստ SERVICE_LOCATOR_VALUE-ի
-        Task<List<SIDSearchResultDto>> SearchAsync(string value);
+        // Որոնում՝ ըստ SID-ի (SERVICE_LOCATOR_VALUE), provider-ի համարի կամ provider-ի անվան
+        Task<List<SIDSearchResultDto>> SearchAsync(string value, SearchType type);
 
         // Նոր մեթոդները
         Task<List<ExcelSheetPreviewDto>> ParseExcelPreviewAsync(IFormFile file);
