@@ -18,9 +18,9 @@
                 @* Որոնման տեսակը՝ SID / provider-ի համար / provider-ի անուն *@
                 <select class="form-select flex-grow-0 w-auto fw-semibold"
                         @bind="searchType" @bind:after="OnSearchTypeChanged">
-                    <option value="@SearchType.Sid">by sid</option>
-                    <option value="@SearchType.ProviderNumber">by provider number</option>
-                    <option value="@SearchType.ProviderName">by provider name</option>
+                    <option value="@SearchType.Sid">SID</option>
+                    <option value="@SearchType.ProviderNumber">Provider Number</option>
+                    <option value="@SearchType.ProviderName">Provider Name</option>
                 </select>
                 <span class="input-group-text bg-white border-end-0">
                     <i class="bi bi-search text-muted"></i>
